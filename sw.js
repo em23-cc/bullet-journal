@@ -1,4 +1,4 @@
-const cacheName = "personal-task-inbox:v15";
+const cacheName = "personal-task-inbox:v16";
 const assets = ["./", "./index.html", "./styles.css?v=10", "./parser.js?v=2", "./app.js?v=12", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (event) => {

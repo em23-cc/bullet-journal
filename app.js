@@ -461,6 +461,19 @@ function renderMonth() {
   }
 
   dom.monthLayout.append(dateCol, taskCol);
+
+  // Sync row heights between date column and task column
+  requestAnimationFrame(() => {
+    const dateRows = dateCol.querySelectorAll(".month-date-row");
+    const taskRows = taskCol.querySelectorAll(".month-task-row");
+    dateRows.forEach((dr, i) => {
+      const tr = taskRows[i];
+      if (!tr) return;
+      const maxH = Math.max(dr.scrollHeight, tr.scrollHeight);
+      dr.style.minHeight = maxH + "px";
+      tr.style.minHeight = maxH + "px";
+    });
+  });
 }
 
 /* Monthly todo panel */
@@ -512,8 +525,7 @@ function initMonthFab() {
   fab.addEventListener("click", openFab);
   fab.textContent = "待办 ▲";
   sidebar.addEventListener("click", (e) => {
-    if (e.target === sidebar) return;
-    // Close when clicking empty area or on mobile backdrop behavior
+    e.stopPropagation();
   });
   document.addEventListener("click", (e) => {
     if (sidebar.classList.contains("open") && !sidebar.contains(e.target) && e.target !== fab && !fab.contains(e.target)) {
@@ -635,17 +647,26 @@ function renderYear() {
       const dateKey = toDateKey(state.viewYear, m + 1, d);
       const cell = mkEl("div", { className: "mini-day", textContent: String(d) });
 
-      // Black dot for any date with events
-      const hasEvents = state.yearlyEvents.some((e) => {
-        const sd = e.startDate || e.date;
-        const ed = e.endDate || sd;
-        return dateKey >= sd && dateKey <= ed && e.year === state.viewYear;
+      // Colored bars for spanning events, dots for single-day
+      state.yearlyEvents.forEach((evt) => {
+        const sd = evt.startDate || evt.date;
+        const ed = evt.endDate || sd;
+        if (dateKey < sd || dateKey > ed || evt.year !== state.viewYear) return;
+
+        if (sd === ed) {
+          const dot = mkEl("div", { className: "dot" });
+          dot.style.backgroundColor = evt.color;
+          cell.append(dot);
+        } else {
+          const bar = mkEl("div", { className: "bar" });
+          bar.style.backgroundColor = evt.color;
+          if (dateKey === sd && dateKey === ed) bar.classList.add("single");
+          else if (dateKey === sd) bar.classList.add("start");
+          else if (dateKey === ed) bar.classList.add("end");
+          else bar.classList.add("mid");
+          cell.append(bar);
+        }
       });
-      if (hasEvents) {
-        const dot = mkEl("div", { className: "dot" });
-        dot.style.backgroundColor = "#333";
-        cell.append(dot);
-      }
 
       // Highlight selected start
       if (yearSelectedStart && yearSelectedStart === dateKey) {
@@ -683,11 +704,11 @@ function renderYear() {
 
       if (ed && ed !== sd) {
         const edDay = parseInt(ed.split("-")[2]);
-        txt.textContent = `${sdDay}-${edDay}日 ${evt.text}`;
+        txt.textContent = `-${sdDay}-${edDay}日 ${evt.text}`;
       } else if (isSameDate) {
-        txt.textContent = `       ${evt.text}`;
+        txt.textContent = `         ${evt.text}`;
       } else {
-        txt.textContent = `${sdDay}日 ${evt.text}`;
+        txt.textContent = `-${sdDay}日 ${evt.text}`;
       }
 
       item.append(dot, txt);

@@ -233,11 +233,15 @@ h3 { font-size: 15px; }
   margin-bottom: 8px; color: var(--muted); font-size: 13px; font-weight: 700;
 }
 
+.week-todo-btns { display: flex; gap: 6px; align-items: center; }
+
 .week-todo-add {
   width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 50%;
-  background: var(--paper); color: var(--muted); font-size: 18px;
+  background: var(--paper); color: var(--muted); font-size: 16px;
   cursor: pointer; display: inline-grid; place-items: center; line-height: 1;
 }
+
+.week-todo-add:hover { background: var(--paper-soft); color: var(--ink); }
 
 .day-box {
   min-height: 130px; padding: 10px;
@@ -322,6 +326,8 @@ h3 { font-size: 15px; }
   margin-top: 14px;
   align-items: start;
 }
+
+.month-todo-fab { display: none; }
 
 .month-todo-sidebar {
   border: 1px solid var(--line-soft); border-radius: 3px;
@@ -756,7 +762,29 @@ h3 { font-size: 15px; }
   .year-grid { grid-template-columns: 1fr; }
 
   .month-split { grid-template-columns: 1fr; }
-  .month-todo-sidebar { margin-top: 0; }
+
+  .month-todo-sidebar {
+    position: fixed; bottom: calc(var(--tab-height) + 12px); right: 12px;
+    z-index: 65; width: min(300px, calc(100% - 24px)); max-height: 60vh;
+    overflow-y: auto; border-radius: 12px;
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.15);
+    display: none;
+  }
+
+  .month-todo-sidebar.open { display: block; animation: sheetUp 0.25s ease; }
+
+  .month-todo-fab {
+    position: fixed; bottom: calc(var(--tab-height) + 12px); right: 12px;
+    z-index: 66; min-height: 44px; padding: 0 16px;
+    border: 1px solid var(--line); border-radius: 22px;
+    background: var(--paper); color: var(--ink);
+    font-weight: 700; font-size: 14px; cursor: pointer;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .month-todo-fab.hidden { display: none; }
+
   .month-layout { grid-template-columns: 52px minmax(0, 1fr); }
 
   .today-sheet {

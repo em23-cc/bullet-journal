@@ -46,6 +46,7 @@ const state = {
   activeBullet: null,
   activePopoverBullet: null,
   pendingYearEvent: null,
+  currentSheetDate: todayKey(),
   deferredInstallPrompt: null,
 };
 
@@ -133,7 +134,7 @@ $$(".tab-button").forEach((btn) => {
 
     if (tab === "inbox") renderInboxHistory();
     if (tab === "week") renderWeek();
-    if (tab === "month") { renderMonth(); renderMonthTodos(); }
+    if (tab === "month") { renderMonth(); renderMonthTodos(); initMonthFab(); }
     if (tab === "year") renderYear();
   });
 });
@@ -249,10 +250,11 @@ function closeTodaySheet() {
   dom.todaySheet.hidden = true;
 }
 
-function openTodaySheet() {
+function openTodaySheet(dateKey) {
+  state.currentSheetDate = dateKey || todayKey();
   dom.todayBackdrop.hidden = false;
   dom.todaySheet.hidden = false;
-  renderTodaySheet();
+  renderTodaySheet(state.currentSheetDate);
 }
 
 function getWeekBase() {
@@ -281,6 +283,18 @@ function renderWeek() {
   // 一周待办
   const todoBox = mkEl("section", { className: "week-todo" });
   const todoHdr = mkEl("div", { className: "week-todo-header", innerHTML: "<span>一周待办</span>" });
+  const todoBtns = mkEl("div", { className: "week-todo-btns" });
+  const todoMigAll = mkEl("button", { className: "week-todo-add", textContent: "→", title: "全部迁到下周" });
+  todoMigAll.addEventListener("click", () => {
+    const undone = state.bullets.filter((b) => !b.dateKey && b.symbol !== "×");
+    if (!undone.length) { alert("没有未完成的待办。"); return; }
+    if (!confirm(`把 ${undone.length} 条未完成的待办移到下周？`)) return;
+    const nextMon = addDays(getWeekBase(), 7);
+    const nextMonKey = dateKeyFromDate(nextMon);
+    undone.forEach((b) => { b.dateKey = nextMonKey; });
+    saveJson(STORAGE_KEY, state.bullets);
+    renderWeek();
+  });
   const todoAdd = mkEl("button", { className: "week-todo-add", textContent: "+", title: "添加" });
   todoAdd.addEventListener("click", () => {
     const txt = prompt("添加一条本周待办：");
@@ -290,7 +304,8 @@ function renderWeek() {
       renderWeek();
     }
   });
-  todoHdr.append(todoAdd);
+  todoBtns.append(todoMigAll, todoAdd);
+  todoHdr.append(todoBtns);
   const todoList = mkEl("div", { className: "day-list" });
   const weekBullets = state.bullets.filter((b) => !b.dateKey);
   if (weekBullets.length) {
@@ -314,12 +329,10 @@ function renderWeek() {
     }
     box.append(title, list);
 
-    if (day.key === today) {
-      box.addEventListener("click", (e) => {
-        if (e.target.closest(".bullet-symbol") || e.target.closest(".bullet-text")) return;
-        openTodaySheet();
-      });
-    }
+    box.addEventListener("click", (e) => {
+      if (e.target.closest(".bullet-symbol") || e.target.closest(".bullet-text") || e.target.closest(".delete-button")) return;
+      openTodaySheet(day.key);
+    });
 
     dom.weekGrid.append(box);
   });
@@ -335,21 +348,23 @@ dom.quickAddForm.addEventListener("submit", (event) => {
   if (!text) { dom.quickText.focus(); return; }
   state.bullets.unshift({
     id: createId(), symbol: dom.quickSymbol.value,
-    text, dateKey: todayKey(), source: "手动记录", createdAt: new Date().toISOString(),
+    text, dateKey: state.currentSheetDate, source: "手动记录", createdAt: new Date().toISOString(),
   });
   dom.quickText.value = "";
   saveJson(STORAGE_KEY, state.bullets);
-  renderTodaySheet();
+  renderTodaySheet(state.currentSheetDate);
   renderWeek();
 });
 
-function renderTodaySheet() {
-  dom.todayDate.textContent = formatFullDate(new Date());
-  const bullets = state.bullets.filter((b) => b.dateKey === todayKey());
+function renderTodaySheet(dateKey) {
+  const dk = dateKey || todayKey();
+  const date = new Date(dk + "T00:00:00");
+  dom.todayDate.textContent = formatFullDate(date);
+  const bullets = state.bullets.filter((b) => b.dateKey === dk);
   dom.todayList.replaceChildren();
 
   if (!bullets.length) {
-    dom.todayList.append(mkEl("p", { className: "empty-state", textContent: "今天还没有子弹。" }));
+    dom.todayList.append(mkEl("p", { className: "empty-state", textContent: "这天还没有子弹。" }));
     return;
   }
   bullets.forEach((b) => dom.todayList.append(createBulletNode(b, "today")));
@@ -398,7 +413,7 @@ function renderMonth() {
     // Task column
     const dateKey = toDateKey(year, month + 1, d);
     const dayBullets = state.bullets.filter((b) => b.dateKey === dateKey);
-    const dayEvents = state.yearlyEvents.filter((e) => e.date === dateKey);
+    const dayEvents = state.yearlyEvents.filter((e) => (e.date || e.startDate) === dateKey);
     const taskRow = mkEl("div", { className: `month-task-row${isWeekDivider ? " week-divider" : ""}` });
 
     if (dayBullets.length) {
@@ -441,6 +456,29 @@ $$(".month-todo-input").forEach((inp) => {
 function monthKey() {
   const base = getMonthBase();
   return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}`;
+}
+
+let monthFabInited = false;
+function initMonthFab() {
+  if (monthFabInited) return;
+  monthFabInited = true;
+  const fab = document.querySelector("#monthTodoFab");
+  const sidebar = document.querySelector("#monthTodoSidebar");
+  if (!fab || !sidebar) return;
+
+  const openFab = () => { sidebar.classList.add("open"); fab.classList.add("hidden"); };
+  const closeFab = () => { sidebar.classList.remove("open"); fab.classList.remove("hidden"); };
+  fab.addEventListener("click", openFab);
+  fab.textContent = "待办 ▲";
+  sidebar.addEventListener("click", (e) => {
+    if (e.target === sidebar) return;
+    // Close when clicking empty area or on mobile backdrop behavior
+  });
+  document.addEventListener("click", (e) => {
+    if (sidebar.classList.contains("open") && !sidebar.contains(e.target) && e.target !== fab && !fab.contains(e.target)) {
+      closeFab();
+    }
+  });
 }
 
 function renderMonthTodos() {
@@ -551,7 +589,7 @@ function renderYear() {
       const dateKey = toDateKey(state.viewYear, m + 1, d);
       const cell = mkEl("div", { className: "mini-day", textContent: String(d) });
 
-      const dayEvents = state.yearlyEvents.filter((e) => e.date === dateKey && e.year === state.viewYear);
+      const dayEvents = state.yearlyEvents.filter((e) => (e.date || e.startDate) === dateKey && e.year === state.viewYear);
 
       dayEvents.forEach((evt) => {
         const dot = mkEl("div", { className: "dot" });
@@ -568,7 +606,7 @@ function renderYear() {
     // Events list below calendar
     const eventsList = mkEl("div", { className: "year-events-list" });
     const monthEvents = state.yearlyEvents.filter((e) => {
-      const mNum = parseInt(e.date.split("-")[1]) - 1;
+      const mNum = parseInt((e.date || e.startDate || "").split("-")[1]) - 1;
       return mNum === m && e.year === state.viewYear;
     });
     monthEvents.forEach((evt) => {
@@ -680,10 +718,70 @@ function createBulletNode(bullet, mode) {
 /* Symbol popover */
 
 function showSymbolPopover(anchor) {
+  const bullet = state.activePopoverBullet;
   const rect = anchor.getBoundingClientRect();
+
+  // Week-todo: show weekday menu instead of symbol menu
+  if (bullet && !bullet.dateKey) {
+    const weekBase = getWeekBase();
+    const weekdays = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+    dom.symbolPopover.replaceChildren();
+    weekdays.forEach((wd, i) => {
+      const date = addDays(weekBase, i);
+      const btn = mkEl("button", { className: "symbol-option" });
+      btn.textContent = `${wd} ${formatMonthDay(date)}`;
+      btn.addEventListener("click", () => {
+        bullet.dateKey = dateKeyFromDate(date);
+        saveJson(STORAGE_KEY, state.bullets);
+        hideSymbolPopover();
+        renderAll();
+      });
+      dom.symbolPopover.append(btn);
+    });
+    dom.symbolPopover.hidden = false;
+    dom.symbolPopover.style.top = `${rect.bottom + 4}px`;
+    dom.symbolPopover.style.left = `${Math.min(rect.left, window.innerWidth - 160)}px`;
+    return;
+  }
+
+  // Default symbol menu
+  rebuildSymbolMenu();
   dom.symbolPopover.hidden = false;
   dom.symbolPopover.style.top = `${rect.bottom + 4}px`;
   dom.symbolPopover.style.left = `${Math.min(rect.left, window.innerWidth - 140)}px`;
+}
+
+function rebuildSymbolMenu() {
+  dom.symbolPopover.replaceChildren();
+  [
+    { sym: "×", label: "× 完成" },
+    { sym: ">", label: "> 迁移" },
+    { sym: "<", label: "< 排期" },
+    { sym: "–", label: "– 备注" },
+    { sym: "*", label: "* 重要" },
+    { sym: "•", label: "• 任务" },
+  ].forEach(({ sym, label }) => {
+    const btn = mkEl("button", { className: "symbol-option" });
+    btn.dataset.sym = sym;
+    btn.textContent = label;
+    btn.addEventListener("click", () => {
+      const b = state.activePopoverBullet;
+      if (!b) return;
+      if (sym === "×") b.symbol = "×";
+      else if (sym === ">") {
+        b.symbol = ">";
+        b.dateKey = dateKeyFromDate(addDays(new Date(b.dateKey + "T00:00:00"), 1));
+      }
+      else if (sym === "<") b.symbol = "<";
+      else if (sym === "–") b.symbol = "–";
+      else if (sym === "*") b.symbol = "*";
+      else if (sym === "•") b.symbol = "•";
+      saveJson(STORAGE_KEY, state.bullets);
+      hideSymbolPopover();
+      renderAll();
+    });
+    dom.symbolPopover.append(btn);
+  });
 }
 
 function hideSymbolPopover() {
@@ -691,27 +789,7 @@ function hideSymbolPopover() {
   state.activePopoverBullet = null;
 }
 
-$$(".symbol-option").forEach((opt) => {
-  opt.addEventListener("click", () => {
-    const bullet = state.activePopoverBullet;
-    if (!bullet) return;
-    const sym = opt.dataset.sym;
-
-    if (sym === "×") { bullet.symbol = "×"; }
-    else if (sym === ">") {
-      bullet.symbol = ">";
-      bullet.dateKey = dateKeyFromDate(addDays(new Date(bullet.dateKey + "T00:00:00"), 1));
-    }
-    else if (sym === "<") { bullet.symbol = "<"; }
-    else if (sym === "–") { bullet.symbol = "–"; }
-    else if (sym === "*") { bullet.symbol = "*"; }
-    else if (sym === "•") { bullet.symbol = "•"; }
-
-    saveJson(STORAGE_KEY, state.bullets);
-    hideSymbolPopover();
-    renderAll();
-  });
-});
+rebuildSymbolMenu();
 
 document.addEventListener("click", (e) => {
   if (!dom.symbolPopover.hidden && !dom.symbolPopover.contains(e.target)) {
@@ -725,10 +803,10 @@ document.addEventListener("click", (e) => {
 
 function renderAll() {
   renderWeek();
-  if (!dom.todaySheet.hidden) renderTodaySheet();
-  if (!dom.monthPanel.hidden) { renderMonth(); renderMonthTodos(); }
-  if (!dom.yearPanel.hidden) renderYear();
-  if (!dom.inboxPanel.hidden) renderInboxHistory();
+  if (!dom.todaySheet.hidden) renderTodaySheet(state.currentSheetDate);
+  if (!allPanels.month.hidden) { renderMonth(); renderMonthTodos(); }
+  if (!allPanels.year.hidden) renderYear();
+  if (!allPanels.inbox.hidden) renderInboxHistory();
 }
 
 function renderLegend() {

@@ -73,6 +73,7 @@ h3 { font-size: 15px; }
   color: var(--muted); font-size: 13px;
 }
 .eyebrow, .page-kicker { margin: 0 0 4px; font-weight: 700; }
+.version-badge { font-weight: 400; color: var(--muted); font-size: 11px; }
 
 /* ---------- Tab Bar ---------- */
 

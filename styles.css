@@ -302,7 +302,7 @@ h3 { font-size: 15px; }
 .month-task-col { background: rgba(255, 253, 247, 0.7); }
 
 .month-task-row {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px;
   padding: 4px 8px; min-height: 32px;
   border-bottom: 1px solid var(--line-soft);
 }

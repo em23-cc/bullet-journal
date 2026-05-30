@@ -286,12 +286,12 @@ function renderWeek() {
   const todoBtns = mkEl("div", { className: "week-todo-btns" });
   const todoMigAll = mkEl("button", { className: "week-todo-add", textContent: "→", title: "全部迁到下周" });
   todoMigAll.addEventListener("click", () => {
-    const undone = state.bullets.filter((b) => !b.dateKey && b.symbol !== "×");
+    const currentWk = dateKeyFromDate(getWeekBase());
+    const undone = state.bullets.filter((b) => !b.dateKey && b.symbol !== "×" && (b.weekKey || currentWk) === currentWk);
     if (!undone.length) { alert("没有未完成的待办。"); return; }
     if (!confirm(`把 ${undone.length} 条未完成的待办移到下周？`)) return;
-    const nextMon = addDays(getWeekBase(), 7);
-    const nextMonKey = dateKeyFromDate(nextMon);
-    undone.forEach((b) => { b.dateKey = nextMonKey; });
+    const nextWk = dateKeyFromDate(addDays(getWeekBase(), 7));
+    undone.forEach((b) => { b.weekKey = nextWk; });
     saveJson(STORAGE_KEY, state.bullets);
     renderWeek();
   });
@@ -299,7 +299,7 @@ function renderWeek() {
   todoAdd.addEventListener("click", () => {
     const txt = prompt("添加一条本周待办：");
     if (txt?.trim()) {
-      state.bullets.unshift({ id: createId(), symbol: "•", text: txt.trim(), dateKey: "", source: "手动记录", createdAt: new Date().toISOString() });
+      state.bullets.unshift({ id: createId(), symbol: "•", text: txt.trim(), dateKey: "", weekKey: dateKeyFromDate(getWeekBase()), source: "手动记录", createdAt: new Date().toISOString() });
       saveJson(STORAGE_KEY, state.bullets);
       renderWeek();
     }
@@ -307,7 +307,8 @@ function renderWeek() {
   todoBtns.append(todoMigAll, todoAdd);
   todoHdr.append(todoBtns);
   const todoList = mkEl("div", { className: "day-list" });
-  const weekBullets = state.bullets.filter((b) => !b.dateKey);
+  const currentWk = dateKeyFromDate(getWeekBase());
+  const weekBullets = state.bullets.filter((b) => !b.dateKey && (!b.weekKey || b.weekKey === currentWk));
   if (weekBullets.length) {
     weekBullets.forEach((b) => todoList.append(createBulletNode(b, "compact")));
   } else {
@@ -463,17 +464,19 @@ function renderMonth() {
   dom.monthLayout.append(dateCol, taskCol);
 
   // Sync row heights between date column and task column
-  requestAnimationFrame(() => {
+  const syncHeights = () => {
     const dateRows = dateCol.querySelectorAll(".month-date-row");
     const taskRows = taskCol.querySelectorAll(".month-task-row");
     dateRows.forEach((dr, i) => {
       const tr = taskRows[i];
       if (!tr) return;
       const maxH = Math.max(dr.scrollHeight, tr.scrollHeight);
-      dr.style.minHeight = maxH + "px";
-      tr.style.minHeight = maxH + "px";
+      dr.style.height = maxH + "px";
+      tr.style.height = maxH + "px";
     });
-  });
+  };
+  setTimeout(syncHeights, 0);
+  setTimeout(syncHeights, 50);
 }
 
 /* Monthly todo panel */
@@ -492,6 +495,7 @@ $$(".month-todo-input").forEach((inp) => {
     if (e.key === "Enter" && inp.value.trim()) {
       addMonthTodo(inp.dataset.cat, inp.value.trim());
       inp.value = "";
+      inp.focus();
     }
   });
 });
@@ -646,6 +650,7 @@ function renderYear() {
     for (let d = 1; d <= daysInMonth; d++) {
       const dateKey = toDateKey(state.viewYear, m + 1, d);
       const cell = mkEl("div", { className: "mini-day", textContent: String(d) });
+      cell.dataset.date = dateKey;
 
       // Colored bars for spanning events, dots for single-day
       state.yearlyEvents.forEach((evt) => {
@@ -704,7 +709,13 @@ function renderYear() {
 
       if (ed && ed !== sd) {
         const edDay = parseInt(ed.split("-")[2]);
-        txt.textContent = `-${sdDay}-${edDay}日 ${evt.text}`;
+        const sdMonth = parseInt(sd.split("-")[1]);
+        const edMonth = parseInt(ed.split("-")[1]);
+        if (sdMonth !== edMonth) {
+          txt.textContent = `-${sdMonth}月${sdDay}日-${edMonth}月${edDay}日 ${evt.text}`;
+        } else {
+          txt.textContent = `-${sdDay}-${edDay}日 ${evt.text}`;
+        }
       } else if (isSameDate) {
         txt.textContent = `         ${evt.text}`;
       } else {
@@ -729,14 +740,22 @@ function onYearDayClick(dateKey) {
     return;
   }
 
-  // Second click — determine range
-  let start = yearSelectedStart;
-  let end = dateKey;
-  if (end < start) [start, end] = [end, start];
+  // Second click — order the dates, then highlight end and open picker
+  const savedStart = yearSelectedStart;
+  yearSelectedStart = null;
+  let s = savedStart, e = dateKey;
+  if (e < s) [s, e] = [e, s];
 
-  openYearEventPicker(start, null, end === start ? null : end);
-  clearYearSelection();
-  renderYear();
+  setTimeout(() => {
+    const endCell = document.querySelector(`.mini-day[data-date="${e}"]`);
+    if (endCell) endCell.classList.add("selected");
+  }, 50);
+
+  setTimeout(() => {
+    openYearEventPicker(s, null, e === s ? null : e);
+    clearYearSelection();
+    renderYear();
+  }, 250);
 }
 
 function openYearEventPicker(startDate, existingEvent, endDate) {

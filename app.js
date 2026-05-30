@@ -426,9 +426,36 @@ function renderMonth() {
       dot.style.backgroundColor = evt.color;
       const txt = mkEl("span", { className: "ye-text", textContent: evt.text });
       evtEl.append(dot, txt);
-      evtEl.addEventListener("click", () => openYearEventPicker(evt.date, evt));
+      evtEl.addEventListener("click", () => openYearEventPicker((evt.date || evt.startDate), evt));
       taskRow.append(evtEl);
     });
+
+    // + button
+    const addBtn = mkEl("button", { className: "month-add-btn", textContent: "+", title: "添加任务" });
+    addBtn.addEventListener("click", () => {
+      const inp = mkEl("input", { className: "month-inline-input", placeholder: "添加..." });
+      taskRow.append(inp);
+      inp.focus();
+      addBtn.hidden = true;
+      inp.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" && inp.value.trim()) {
+          state.bullets.unshift({
+            id: createId(), symbol: "•", text: inp.value.trim(),
+            dateKey, source: "手动记录", createdAt: new Date().toISOString(),
+          });
+          saveJson(STORAGE_KEY, state.bullets);
+          renderMonth();
+          renderMonthTodos();
+        } else if (ev.key === "Escape") {
+          inp.remove();
+          addBtn.hidden = false;
+        }
+      });
+      inp.addEventListener("blur", () => {
+        if (!inp.value.trim()) { inp.remove(); addBtn.hidden = false; }
+      });
+    });
+    taskRow.append(addBtn);
 
     taskCol.append(taskRow);
   }
@@ -438,17 +465,31 @@ function renderMonth() {
 
 /* Monthly todo panel */
 
+function addMonthTodo(cat, text) {
+  state.monthlyTodos.push({
+    id: createId(), symbol: "•", text,
+    category: cat, month: monthKey(), createdAt: new Date().toISOString(),
+  });
+  saveJson(MONTHLY_KEY, state.monthlyTodos);
+  renderMonthTodos();
+}
+
 $$(".month-todo-input").forEach((inp) => {
   inp.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && inp.value.trim()) {
-      const cat = inp.dataset.cat;
-      state.monthlyTodos.push({
-        id: createId(), symbol: "•", text: inp.value.trim(),
-        category: cat, month: monthKey(), createdAt: new Date().toISOString(),
-      });
+      addMonthTodo(inp.dataset.cat, inp.value.trim());
       inp.value = "";
-      saveJson(MONTHLY_KEY, state.monthlyTodos);
-      renderMonthTodos();
+    }
+  });
+});
+
+$$(".mtodo-add-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const input = btn.parentElement.querySelector(".month-todo-input");
+    if (input.value.trim()) {
+      addMonthTodo(btn.dataset.cat, input.value.trim());
+      input.value = "";
+      input.focus();
     }
   });
 });
@@ -529,7 +570,7 @@ dom.yearNext.addEventListener("click", () => { state.viewYear++; renderYear(); }
 dom.halfFirstBtn.addEventListener("click", () => { state.half = "first"; dom.halfFirstBtn.classList.add("active"); dom.halfSecondBtn.classList.remove("active"); renderYear(); });
 dom.halfSecondBtn.addEventListener("click", () => { state.half = "second"; dom.halfSecondBtn.classList.add("active"); dom.halfFirstBtn.classList.remove("active"); renderYear(); });
 
-dom.colorCancelBtn.addEventListener("click", () => { dom.colorPicker.hidden = true; state.pendingYearEvent = null; });
+dom.colorCancelBtn.addEventListener("click", () => { dom.colorPicker.hidden = true; state.pendingYearEvent = null; clearYearSelection(); });
 dom.colorDeleteBtn.addEventListener("click", () => {
   if (state.pendingYearEvent?.eventId) {
     state.yearlyEvents = state.yearlyEvents.filter((e) => e.id !== state.pendingYearEvent.eventId);
@@ -537,25 +578,30 @@ dom.colorDeleteBtn.addEventListener("click", () => {
   }
   dom.colorPicker.hidden = true;
   state.pendingYearEvent = null;
+  clearYearSelection();
   renderYear();
 });
 
 dom.colorSaveBtn.addEventListener("click", () => {
   const text = dom.colorEventInput.value.trim();
   if (!text || !state.pendingYearEvent) return;
-  const { date, color, eventId } = state.pendingYearEvent;
+  const { startDate, endDate, color, eventId } = state.pendingYearEvent;
 
   if (eventId) {
     const evt = state.yearlyEvents.find((e) => e.id === eventId);
-    if (evt) { evt.text = text; evt.color = color; }
+    if (evt) { evt.text = text; evt.color = color; evt.startDate = startDate; evt.endDate = endDate; }
   } else {
-    state.yearlyEvents.push({ id: createId(), color, text, date, year: state.viewYear });
+    state.yearlyEvents.push({ id: createId(), color, text, startDate, endDate: endDate || null, year: state.viewYear });
   }
   saveJson(YEARLY_KEY, state.yearlyEvents);
   dom.colorPicker.hidden = true;
   state.pendingYearEvent = null;
+  clearYearSelection();
   renderYear();
 });
+
+let yearSelectedStart = null;
+function clearYearSelection() { yearSelectedStart = null; }
 
 function getMonthsForHalf() {
   return state.half === "first" ? [0, 1, 2, 3, 4, 5] : [6, 7, 8, 9, 10, 11];
@@ -589,15 +635,24 @@ function renderYear() {
       const dateKey = toDateKey(state.viewYear, m + 1, d);
       const cell = mkEl("div", { className: "mini-day", textContent: String(d) });
 
-      const dayEvents = state.yearlyEvents.filter((e) => (e.date || e.startDate) === dateKey && e.year === state.viewYear);
-
-      dayEvents.forEach((evt) => {
-        const dot = mkEl("div", { className: "dot" });
-        dot.style.backgroundColor = evt.color;
-        cell.append(dot);
+      // Black dot for any date with events
+      const hasEvents = state.yearlyEvents.some((e) => {
+        const sd = e.startDate || e.date;
+        const ed = e.endDate || sd;
+        return dateKey >= sd && dateKey <= ed && e.year === state.viewYear;
       });
+      if (hasEvents) {
+        const dot = mkEl("div", { className: "dot" });
+        dot.style.backgroundColor = "#333";
+        cell.append(dot);
+      }
 
-      cell.addEventListener("click", () => openYearEventPicker(dateKey));
+      // Highlight selected start
+      if (yearSelectedStart && yearSelectedStart === dateKey) {
+        cell.classList.add("selected");
+      }
+
+      cell.addEventListener("click", () => onYearDayClick(dateKey));
       miniCal.append(cell);
     }
 
@@ -605,32 +660,72 @@ function renderYear() {
 
     // Events list below calendar
     const eventsList = mkEl("div", { className: "year-events-list" });
-    const monthEvents = state.yearlyEvents.filter((e) => {
-      const mNum = parseInt((e.date || e.startDate || "").split("-")[1]) - 1;
-      return mNum === m && e.year === state.viewYear;
-    });
+    const monthEvents = state.yearlyEvents
+      .filter((e) => {
+        const sd = e.startDate || e.date;
+        const mNum = parseInt(sd.split("-")[1]) - 1;
+        return mNum === m && e.year === state.viewYear;
+      })
+      .sort((a, b) => (a.startDate || a.date).localeCompare(b.startDate || b.date));
+
+    let lastDate = "";
     monthEvents.forEach((evt) => {
+      const sd = evt.startDate || evt.date;
+      const ed = evt.endDate;
+      const sdDay = parseInt(sd.split("-")[2]);
+      const isSameDate = sd === lastDate;
+
       const item = mkEl("div", { className: "year-event-item" });
       const dot = mkEl("div", { className: "year-event-dot" });
       dot.style.backgroundColor = evt.color;
-      const txt = mkEl("span", { className: "year-event-text", textContent: evt.text });
+
+      const txt = mkEl("span", { className: "year-event-text" });
+
+      if (ed && ed !== sd) {
+        const edDay = parseInt(ed.split("-")[2]);
+        txt.textContent = `${sdDay}-${edDay}日 ${evt.text}`;
+      } else if (isSameDate) {
+        txt.textContent = `       ${evt.text}`;
+      } else {
+        txt.textContent = `${sdDay}日 ${evt.text}`;
+      }
+
       item.append(dot, txt);
-      item.addEventListener("click", () => openYearEventPicker(evt.date, evt));
+      item.addEventListener("click", () => openYearEventPicker(sd, evt));
       eventsList.append(item);
+      lastDate = sd;
     });
+
     card.append(eventsList);
     dom.yearGrid.append(card);
   });
 }
 
-function openYearEventPicker(dateKey, existingEvent) {
+function onYearDayClick(dateKey) {
+  if (!yearSelectedStart) {
+    yearSelectedStart = dateKey;
+    renderYear();
+    return;
+  }
+
+  // Second click — determine range
+  let start = yearSelectedStart;
+  let end = dateKey;
+  if (end < start) [start, end] = [end, start];
+
+  openYearEventPicker(start, null, end === start ? null : end);
+  clearYearSelection();
+  renderYear();
+}
+
+function openYearEventPicker(startDate, existingEvent, endDate) {
   dom.colorPicker.hidden = false;
   dom.colorEventInput.value = existingEvent?.text || "";
   dom.colorDeleteBtn.hidden = !existingEvent;
 
   state.pendingYearEvent = existingEvent
-    ? { date: existingEvent.date, color: existingEvent.color, eventId: existingEvent.id }
-    : { date: dateKey, color: YEAR_COLORS[0] };
+    ? { startDate: existingEvent.startDate || existingEvent.date, endDate: existingEvent.endDate || null, color: existingEvent.color, eventId: existingEvent.id }
+    : { startDate, endDate: endDate || null, color: YEAR_COLORS[0] };
 
   updateColorPickerUI();
 }

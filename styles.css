@@ -359,6 +359,49 @@ h3 { font-size: 15px; }
 }
 .month-todo-input:focus { border-color: var(--accent); border-style: solid; }
 
+.mtodo-input-row { display: flex; gap: 6px; align-items: center; }
+
+.mtodo-add-btn {
+  width: 32px; height: 32px;
+  border: 1px solid var(--line); border-radius: 50%;
+  background: var(--paper); color: var(--muted);
+  font-size: 16px; cursor: pointer; flex-shrink: 0;
+  display: inline-grid; place-items: center;
+}
+
+.mtodo-add-btn:hover { background: var(--paper-soft); }
+
+/* Month inline add */
+.month-add-btn {
+  width: 24px; height: 24px;
+  border: 1px dashed var(--line); border-radius: 50%;
+  background: transparent; color: var(--muted);
+  font-size: 14px; cursor: pointer; flex-shrink: 0;
+  display: inline-grid; place-items: center;
+  opacity: 0; transition: opacity 0.15s;
+  margin-left: auto;
+}
+
+.month-task-row:hover .month-add-btn,
+.month-task-row:focus-within .month-add-btn { opacity: 1; }
+
+@media (hover: none) {
+  .month-add-btn { opacity: 0.4; }
+}
+
+.month-inline-input {
+  min-width: 0; flex: 1; min-height: 28px;
+  padding: 0 6px; border: 1px solid var(--accent); border-radius: 4px;
+  background: var(--paper); color: var(--ink);
+  font-size: 13px; outline: none;
+}
+
+/* Year selected day */
+.mini-day.selected {
+  background: var(--accent); color: white; border-radius: 50%;
+  font-weight: 700;
+}
+
 /* Year event in month view */
 .month-year-event {
   display: flex; align-items: center; gap: 6px;

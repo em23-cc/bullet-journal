@@ -1,0 +1,17 @@
+{
+  "name": "个人任务收件箱",
+  "short_name": "任务收件箱",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f6f3ed",
+  "theme_color": "#f6f3ed",
+  "description": "把班群通知解析成待确认任务的个人计划表。",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

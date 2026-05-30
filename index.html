@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f3ea" />
+    <title>子弹计划</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css?v=7" />
+  </head>
+  <body>
+    <main class="journal-shell">
+      <header class="journal-header">
+        <div>
+          <p class="eyebrow">个人子弹计划</p>
+          <h1 id="pageTitle">本周 · 今天</h1>
+        </div>
+        <div class="header-actions">
+          <button class="icon-button" id="settingsButton" type="button" aria-label="设置" title="设置">&#9881;</button>
+          <button class="icon-button" id="installButton" type="button" aria-label="安装到桌面" title="安装到桌面">
+            <span aria-hidden="true">+</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="capture-strip" aria-labelledby="captureTitle">
+        <div class="capture-head">
+          <div>
+            <h2 id="captureTitle">通知收件箱</h2>
+            <p id="accessHint" class="access-hint"></p>
+          </div>
+          <div class="actions compact-actions">
+            <button class="primary-button" id="parseButton" type="button">解析</button>
+            <button class="ghost-button" id="pasteButton" type="button">粘贴</button>
+          </div>
+        </div>
+        <textarea
+          id="noticeInput"
+          placeholder="粘贴班群通知，解析后会拆成几条待确认的子弹任务。"
+          spellcheck="false"
+        ></textarea>
+      </section>
+
+      <section class="inbox-panel" id="reviewPanel" aria-live="polite" hidden>
+        <div class="section-heading">
+          <h2>待确认子弹</h2>
+          <span id="confidenceBadge" class="badge">待判断</span>
+        </div>
+        <div class="draft-list" id="draftList"></div>
+        <details class="source-details">
+          <summary>查看原通知</summary>
+          <p id="sourceText"></p>
+        </details>
+        <div class="actions">
+          <button class="primary-button" id="createButton" type="button">确认加入</button>
+          <button class="ghost-button" id="ignoreButton" type="button">忽略</button>
+        </div>
+      </section>
+
+      <section class="spread">
+        <section class="week-page paper-page" aria-labelledby="weekTitle">
+          <div class="page-heading">
+            <div>
+              <p class="page-kicker">Weekly Log</p>
+              <h2 id="weekTitle">本周</h2>
+            </div>
+            <p id="weekRange" class="date-range"></p>
+          </div>
+          <div class="week-grid" id="weekGrid"></div>
+          <section class="legend">
+            <h3>符号</h3>
+            <div id="legendList" class="legend-list"></div>
+          </section>
+        </section>
+
+        <section class="today-page paper-page" aria-labelledby="todayTitle">
+          <div class="page-heading">
+            <div>
+              <p class="page-kicker">Daily Log</p>
+              <h2 id="todayTitle">今天</h2>
+            </div>
+            <p id="todayDate" class="date-range"></p>
+          </div>
+
+          <form class="quick-add" id="quickAddForm">
+            <select id="quickSymbol" aria-label="子弹类型">
+              <option value="•">• 任务</option>
+              <option value="○">○ 事件</option>
+              <option value="–">– 备注</option>
+              <option value="*">* 重要</option>
+            </select>
+            <input id="quickText" type="text" placeholder="快速记录一条子弹..." autocomplete="off" />
+            <button class="primary-button" type="submit">加入</button>
+          </form>
+
+          <div class="daily-log" id="todayList"></div>
+        </section>
+      </section>
+    </main>
+
+    <div class="settings-overlay" id="settingsOverlay" hidden>
+      <div class="settings-panel" role="dialog" aria-label="设置">
+        <div class="settings-head">
+          <h2>设置</h2>
+          <button class="icon-button" id="settingsCloseButton" type="button" aria-label="关闭">&times;</button>
+        </div>
+        <label class="settings-field">
+          <span>解析器</span>
+          <select id="parserSelect">
+            <option value="rules">规则解析</option>
+            <option value="deepseek">DeepSeek AI</option>
+          </select>
+        </label>
+        <label class="settings-field" id="apiKeyField">
+          <span>DeepSeek API Key</span>
+          <input id="apiKeyInput" type="password" placeholder="sk-..." autocomplete="off" />
+          <span class="field-hint" id="apiKeyHint"></span>
+        </label>
+        <p class="settings-note">Key 仅保存在此设备的浏览器中。</p>
+      </div>
+    </div>
+
+    <template id="bulletTemplate">
+      <article class="bullet-row">
+        <button class="bullet-symbol" type="button" title="切换状态"></button>
+        <div class="bullet-main">
+          <input class="bullet-text" type="text" />
+          <p class="bullet-meta"></p>
+        </div>
+        <button class="migrate-button" type="button" title="迁移">›</button>
+        <button class="delete-button" type="button" aria-label="删除任务" title="删除">×</button>
+      </article>
+    </template>
+
+    <template id="draftTemplate">
+      <article class="draft-row">
+        <select class="draft-symbol" aria-label="子弹类型">
+          <option value="•">•</option>
+          <option value="○">○</option>
+          <option value="–">–</option>
+          <option value="*">*</option>
+        </select>
+        <input class="draft-text" type="text" />
+        <input class="draft-date" type="date" />
+      </article>
+    </template>
+
+    <script src="./parser.js?v=1"></script>
+    <script src="./app.js?v=9"></script>
+  </body>
+</html>

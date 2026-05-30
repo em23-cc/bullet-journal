@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f7f3ea" />
     <title>子弹计划</title>
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=9" />
+    <link rel="stylesheet" href="./styles.css?v=10" />
   </head>
   <body>
     <main class="journal-shell">
@@ -51,6 +51,11 @@
             <button class="primary-button" id="createButton" type="button">确认加入</button>
             <button class="ghost-button" id="ignoreButton" type="button">忽略</button>
           </div>
+        </section>
+
+        <section class="inbox-history" id="inboxHistory">
+          <h3>最近添加</h3>
+          <div class="history-list" id="historyList"></div>
         </section>
       </section>
 
@@ -112,32 +117,29 @@
           <div class="month-nav">
             <button class="nav-arrow" id="monthPrev" type="button" title="上一月">&larr;</button>
             <button class="nav-arrow" id="monthNext" type="button" title="下一月">&rarr;</button>
-            <button class="month-todo-btn" id="monthTodoBtn" type="button" title="月度待办">&gt;</button>
           </div>
         </div>
 
-        <div class="month-layout" id="monthLayout"></div>
-
-        <!-- 月度待办弹出 -->
-        <div class="panel-backdrop" id="monthTodoBackdrop" hidden></div>
-        <div class="month-todo-panel" id="monthTodoPanel" hidden>
-          <div class="sheet-handle"></div>
-          <h3>月度待办</h3>
-          <div class="month-todo-cat">
-            <p class="cat-label">生活</p>
-            <div class="month-todo-list" id="mtodoLife"></div>
-            <input class="month-todo-input" placeholder="添加生活待办..." data-cat="生活" />
-          </div>
-          <div class="month-todo-cat">
-            <p class="cat-label">学业</p>
-            <div class="month-todo-list" id="mtodoStudy"></div>
-            <input class="month-todo-input" placeholder="添加学业待办..." data-cat="学业" />
-          </div>
-          <div class="month-todo-cat">
-            <p class="cat-label">工作</p>
-            <div class="month-todo-list" id="mtodoWork"></div>
-            <input class="month-todo-input" placeholder="添加工作待办..." data-cat="工作" />
-          </div>
+        <div class="month-split" id="monthSplit">
+          <div class="month-layout" id="monthLayout"></div>
+          <aside class="month-todo-sidebar">
+            <h3>月度待办</h3>
+            <div class="month-todo-cat">
+              <p class="cat-label">生活</p>
+              <div class="month-todo-list" id="mtodoLife"></div>
+              <input class="month-todo-input" placeholder="添加生活待办..." data-cat="生活" />
+            </div>
+            <div class="month-todo-cat">
+              <p class="cat-label">学业</p>
+              <div class="month-todo-list" id="mtodoStudy"></div>
+              <input class="month-todo-input" placeholder="添加学业待办..." data-cat="学业" />
+            </div>
+            <div class="month-todo-cat">
+              <p class="cat-label">工作</p>
+              <div class="month-todo-list" id="mtodoWork"></div>
+              <input class="month-todo-input" placeholder="添加工作待办..." data-cat="工作" />
+            </div>
+          </aside>
         </div>
       </section>
 
@@ -271,6 +273,6 @@
     </template>
 
     <script src="./parser.js?v=2"></script>
-    <script src="./app.js?v=11"></script>
+    <script src="./app.js?v=12"></script>
   </body>
 </html>

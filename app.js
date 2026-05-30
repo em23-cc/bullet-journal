@@ -84,9 +84,6 @@ const dom = {
   monthTitle: $("#monthTitle"),
   monthPrev: $("#monthPrev"),
   monthNext: $("#monthNext"),
-  monthTodoBtn: $("#monthTodoBtn"),
-  monthTodoBackdrop: $("#monthTodoBackdrop"),
-  monthTodoPanel: $("#monthTodoPanel"),
   mtodoLife: $("#mtodoLife"),
   mtodoStudy: $("#mtodoStudy"),
   mtodoWork: $("#mtodoWork"),
@@ -134,8 +131,9 @@ $$(".tab-button").forEach((btn) => {
     const titles = { inbox: "收件箱", week: "本周", month: "月视图", year: "年视图" };
     dom.pageTitle.textContent = titles[tab] || "";
 
+    if (tab === "inbox") renderInboxHistory();
     if (tab === "week") renderWeek();
-    if (tab === "month") renderMonth();
+    if (tab === "month") { renderMonth(); renderMonthTodos(); }
     if (tab === "year") renderYear();
   });
 });
@@ -182,6 +180,7 @@ dom.createButton.addEventListener("click", () => {
   saveJson(STORAGE_KEY, state.bullets);
   clearDraft();
   renderWeek();
+  renderInboxHistory();
 });
 
 dom.ignoreButton.addEventListener("click", clearDraft);
@@ -212,6 +211,27 @@ function clearDraft() {
   dom.reviewPanel.hidden = true;
   dom.noticeInput.value = "";
   dom.draftList.replaceChildren();
+}
+
+function renderInboxHistory() {
+  const historyList = document.querySelector("#historyList");
+  if (!historyList) return;
+  historyList.replaceChildren();
+
+  const recent = state.bullets
+    .filter((b) => b.source && b.source !== "手动记录")
+    .slice(0, 15);
+
+  if (!recent.length) {
+    historyList.append(mkEl("p", { className: "empty-state", textContent: "暂无历史。" }));
+    return;
+  }
+
+  recent.forEach((b) => {
+    const item = mkEl("div", { className: "history-item" });
+    item.innerHTML = `<span class="hi-symbol">${b.symbol}</span><span class="hi-text">${b.text}</span><span class="hi-date">${formatDateKey(b.dateKey) || "未排期"}</span>`;
+    historyList.append(item);
+  });
 }
 
 /* ================================================================
@@ -344,11 +364,9 @@ function getMonthBase() {
   return new Date(now.getFullYear(), now.getMonth() + state.monthOffset, 1);
 }
 
-dom.monthPrev.addEventListener("click", () => { state.monthOffset--; renderMonth(); });
-dom.monthNext.addEventListener("click", () => { state.monthOffset++; renderMonth(); });
+dom.monthPrev.addEventListener("click", () => { state.monthOffset--; renderMonth(); renderMonthTodos(); });
+dom.monthNext.addEventListener("click", () => { state.monthOffset++; renderMonth(); renderMonthTodos(); });
 
-dom.monthTodoBtn.addEventListener("click", () => { dom.monthTodoPanel.hidden = false; dom.monthTodoBackdrop.hidden = false; renderMonthTodos(); });
-dom.monthTodoBackdrop.addEventListener("click", () => { dom.monthTodoPanel.hidden = true; dom.monthTodoBackdrop.hidden = true; });
 
 function renderMonth() {
   const base = getMonthBase();
@@ -369,7 +387,6 @@ function renderMonth() {
     const date = new Date(year, month, d);
     const weekOfMonth = Math.floor((d + firstDow - 1) / 7);
     const dayOfWeek = date.getDay();
-
     const isWeekDivider = d > 1 && weekOfMonth !== prevWeek;
     prevWeek = weekOfMonth;
 
@@ -381,11 +398,23 @@ function renderMonth() {
     // Task column
     const dateKey = toDateKey(year, month + 1, d);
     const dayBullets = state.bullets.filter((b) => b.dateKey === dateKey);
+    const dayEvents = state.yearlyEvents.filter((e) => e.date === dateKey);
     const taskRow = mkEl("div", { className: `month-task-row${isWeekDivider ? " week-divider" : ""}` });
 
     if (dayBullets.length) {
       dayBullets.forEach((b) => taskRow.append(createBulletNode(b, "compact")));
     }
+
+    dayEvents.forEach((evt) => {
+      const evtEl = mkEl("div", { className: "month-year-event" });
+      const dot = mkEl("div", { className: "ye-dot" });
+      dot.style.backgroundColor = evt.color;
+      const txt = mkEl("span", { className: "ye-text", textContent: evt.text });
+      evtEl.append(dot, txt);
+      evtEl.addEventListener("click", () => openYearEventPicker(evt.date, evt));
+      taskRow.append(evtEl);
+    });
+
     taskCol.append(taskRow);
   }
 
@@ -476,14 +505,13 @@ dom.colorDeleteBtn.addEventListener("click", () => {
 dom.colorSaveBtn.addEventListener("click", () => {
   const text = dom.colorEventInput.value.trim();
   if (!text || !state.pendingYearEvent) return;
-  const { startDate, color } = state.pendingYearEvent;
+  const { date, color, eventId } = state.pendingYearEvent;
 
-  if (state.pendingYearEvent.eventId) {
-    // editing existing
-    const evt = state.yearlyEvents.find((e) => e.id === state.pendingYearEvent.eventId);
+  if (eventId) {
+    const evt = state.yearlyEvents.find((e) => e.id === eventId);
     if (evt) { evt.text = text; evt.color = color; }
   } else {
-    state.yearlyEvents.push({ id: createId(), color, text, startDate, endDate: null, year: state.viewYear });
+    state.yearlyEvents.push({ id: createId(), color, text, date, year: state.viewYear });
   }
   saveJson(YEARLY_KEY, state.yearlyEvents);
   dom.colorPicker.hidden = true;
@@ -508,7 +536,6 @@ function renderYear() {
 
     // Mini calendar
     const miniCal = mkEl("div", { className: "mini-cal" });
-    // Day headers
     ["日","一","二","三","四","五","六"].forEach((dh) => {
       miniCal.append(mkEl("div", { className: "mini-day-header", textContent: dh }));
     });
@@ -516,7 +543,6 @@ function renderYear() {
     const daysInMonth = new Date(state.viewYear, m + 1, 0).getDate();
     const firstDow = new Date(state.viewYear, m, 1).getDay();
 
-    // Empty cells before first day
     for (let i = 0; i < firstDow; i++) {
       miniCal.append(mkEl("div", { className: "mini-day empty" }));
     }
@@ -525,33 +551,12 @@ function renderYear() {
       const dateKey = toDateKey(state.viewYear, m + 1, d);
       const cell = mkEl("div", { className: "mini-day", textContent: String(d) });
 
-      // Check for year events on this day
-      const dayEvents = state.yearlyEvents.filter((e) => {
-        if (e.startDate > dateKey) return false;
-        if (e.endDate && e.endDate < dateKey) return false;
-        if (!e.endDate && e.startDate !== dateKey) return false;
-        return e.year === state.viewYear;
-      });
+      const dayEvents = state.yearlyEvents.filter((e) => e.date === dateKey && e.year === state.viewYear);
 
       dayEvents.forEach((evt) => {
-        const isStart = evt.startDate === dateKey;
-        const isEnd = evt.endDate === dateKey;
-        const isSingle = !evt.endDate || evt.startDate === evt.endDate;
-        let cls = "bar ";
-        if (isSingle) cls += "single";
-        else if (isStart) cls += "start";
-        else if (isEnd) cls += "end";
-        else cls += "mid";
-
-        const bar = mkEl("div", { className: cls });
-        bar.style.backgroundColor = evt.color;
-        cell.append(bar);
-
-        if (isStart || isSingle) {
-          const dot = mkEl("div", { className: "dot" });
-          dot.style.backgroundColor = evt.color;
-          cell.append(dot);
-        }
+        const dot = mkEl("div", { className: "dot" });
+        dot.style.backgroundColor = evt.color;
+        cell.append(dot);
       });
 
       cell.addEventListener("click", () => openYearEventPicker(dateKey));
@@ -563,18 +568,16 @@ function renderYear() {
     // Events list below calendar
     const eventsList = mkEl("div", { className: "year-events-list" });
     const monthEvents = state.yearlyEvents.filter((e) => {
-      const startM = parseInt(e.startDate.split("-")[1]) - 1;
-      return startM === m && e.year === state.viewYear;
+      const mNum = parseInt(e.date.split("-")[1]) - 1;
+      return mNum === m && e.year === state.viewYear;
     });
     monthEvents.forEach((evt) => {
       const item = mkEl("div", { className: "year-event-item" });
       const dot = mkEl("div", { className: "year-event-dot" });
       dot.style.backgroundColor = evt.color;
-      const txt = mkEl("span", { className: "year-event-text" });
-      const dateStr = evt.endDate ? `${formatShort(e.startDate)}-${formatShort(evt.endDate)}` : formatShort(e.startDate);
-      txt.innerHTML = `<strong>${evt.text}</strong> ${dateStr}`;
+      const txt = mkEl("span", { className: "year-event-text", textContent: evt.text });
       item.append(dot, txt);
-      item.addEventListener("click", () => openYearEventPicker(evt.startDate, evt));
+      item.addEventListener("click", () => openYearEventPicker(evt.date, evt));
       eventsList.append(item);
     });
     card.append(eventsList);
@@ -588,8 +591,8 @@ function openYearEventPicker(dateKey, existingEvent) {
   dom.colorDeleteBtn.hidden = !existingEvent;
 
   state.pendingYearEvent = existingEvent
-    ? { startDate: existingEvent.startDate, color: existingEvent.color, eventId: existingEvent.id }
-    : { startDate: dateKey, color: YEAR_COLORS[0] };
+    ? { date: existingEvent.date, color: existingEvent.color, eventId: existingEvent.id }
+    : { date: dateKey, color: YEAR_COLORS[0] };
 
   updateColorPickerUI();
 }
@@ -669,7 +672,6 @@ function createBulletNode(bullet, mode) {
 
   if (mode === "compact") {
     migBtn.hidden = true;
-    delBtn.hidden = true;
   }
 
   return node;
@@ -724,8 +726,9 @@ document.addEventListener("click", (e) => {
 function renderAll() {
   renderWeek();
   if (!dom.todaySheet.hidden) renderTodaySheet();
-  if (!dom.monthPanel.hidden) renderMonth();
+  if (!dom.monthPanel.hidden) { renderMonth(); renderMonthTodos(); }
   if (!dom.yearPanel.hidden) renderYear();
+  if (!dom.inboxPanel.hidden) renderInboxHistory();
 }
 
 function renderLegend() {
@@ -831,3 +834,4 @@ function renderAccessHint() {
 renderAccessHint();
 renderLegend();
 renderWeek();
+renderInboxHistory();

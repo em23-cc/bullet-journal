@@ -1,356 +1,296 @@
-const storageKey = "bullet-journal-planner:v2";
-const legacyStorageKey = "personal-task-inbox:v1";
+/* app.js v11 — 4 Tab + 符号菜单 + 月/年视图 + 周偏移 */
 
-const symbols = [
+const STORAGE_KEY = "bullet-journal-planner:v2";
+const LEGACY_KEY = "personal-task-inbox:v1";
+const MONTHLY_KEY = "bullet-journal-planner:monthly-todos";
+const YEARLY_KEY = "bullet-journal-planner:yearly-events";
+
+const DOWS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const SYMBOLS = [
   { value: "•", label: "任务" },
   { value: "×", label: "完成" },
   { value: ">", label: "迁移" },
   { value: "<", label: "排期" },
-  { value: "○", label: "事件" },
   { value: "–", label: "备注" },
   { value: "*", label: "重要" },
 ];
 
+const YEAR_COLORS = ["#e06c6c", "#e0a56c", "#d4c04a", "#6cbe6c", "#6ca8e0", "#b06ce0"];
+
+function mkEl(tag, attrs = {}) {
+  const el = document.createElement(tag);
+  Object.entries(attrs).forEach(([k, v]) => {
+    if (k === "className") el.className = v;
+    else if (k === "innerHTML") el.innerHTML = v;
+    else if (k === "textContent") el.textContent = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2).toLowerCase(), v);
+    else el.setAttribute(k, v);
+  });
+  return el;
+}
+
+function formatShort(dateKey) {
+  const parts = dateKey.split("-");
+  return `${parseInt(parts[1])}/${parseInt(parts[2])}`;
+}
+
 const state = {
-  bullets: loadBullets(),
+  bullets: loadJson(STORAGE_KEY) || migrateLegacy(),
+  monthlyTodos: loadJson(MONTHLY_KEY) || [],
+  yearlyEvents: loadJson(YEARLY_KEY) || [],
   draft: null,
+  weekOffset: 0,
+  monthOffset: 0,
+  viewYear: new Date().getFullYear(),
+  half: "first",
+  activeBullet: null,
+  activePopoverBullet: null,
+  pendingYearEvent: null,
   deferredInstallPrompt: null,
 };
 
-/* ---------- DOM refs ---------- */
+/* ================================================================
+   DOM refs
+   ================================================================ */
 
-const noticeInput = document.querySelector("#noticeInput");
-const parseButton = document.querySelector("#parseButton");
-const pasteButton = document.querySelector("#pasteButton");
-const reviewPanel = document.querySelector("#reviewPanel");
-const confidenceBadge = document.querySelector("#confidenceBadge");
-const draftList = document.querySelector("#draftList");
-const draftTemplate = document.querySelector("#draftTemplate");
-const sourceText = document.querySelector("#sourceText");
-const createButton = document.querySelector("#createButton");
-const ignoreButton = document.querySelector("#ignoreButton");
-const weekGrid = document.querySelector("#weekGrid");
-const weekRange = document.querySelector("#weekRange");
-const legendList = document.querySelector("#legendList");
-const quickAddForm = document.querySelector("#quickAddForm");
-const quickSymbol = document.querySelector("#quickSymbol");
-const quickText = document.querySelector("#quickText");
-const todayList = document.querySelector("#todayList");
-const todayDate = document.querySelector("#todayDate");
-const installButton = document.querySelector("#installButton");
-const accessHint = document.querySelector("#accessHint");
-const pageTitle = document.querySelector("#pageTitle");
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
 
-/* ---------- Tab switching ---------- */
+const dom = {
+  pageTitle: $("#pageTitle"),
+  noticeInput: $("#noticeInput"),
+  parseButton: $("#parseButton"),
+  pasteButton: $("#pasteButton"),
+  reviewPanel: $("#reviewPanel"),
+  confidenceBadge: $("#confidenceBadge"),
+  draftList: $("#draftList"),
+  sourceText: $("#sourceText"),
+  createButton: $("#createButton"),
+  ignoreButton: $("#ignoreButton"),
+  weekGrid: $("#weekGrid"),
+  weekRange: $("#weekRange"),
+  weekPrev: $("#weekPrev"),
+  weekNext: $("#weekNext"),
+  legendList: $("#legendList"),
+  quickAddForm: $("#quickAddForm"),
+  quickSymbol: $("#quickSymbol"),
+  quickText: $("#quickText"),
+  todayList: $("#todayList"),
+  todayDate: $("#todayDate"),
+  todayBackdrop: $("#todayBackdrop"),
+  todaySheet: $("#todaySheet"),
+  todayCloseButton: $("#todayCloseButton"),
+  monthLayout: $("#monthLayout"),
+  monthTitle: $("#monthTitle"),
+  monthPrev: $("#monthPrev"),
+  monthNext: $("#monthNext"),
+  monthTodoBtn: $("#monthTodoBtn"),
+  monthTodoBackdrop: $("#monthTodoBackdrop"),
+  monthTodoPanel: $("#monthTodoPanel"),
+  mtodoLife: $("#mtodoLife"),
+  mtodoStudy: $("#mtodoStudy"),
+  mtodoWork: $("#mtodoWork"),
+  yearGrid: $("#yearGrid"),
+  yearTitle: $("#yearTitle"),
+  yearPrev: $("#yearPrev"),
+  yearNext: $("#yearNext"),
+  halfFirstBtn: $("#halfFirstBtn"),
+  halfSecondBtn: $("#halfSecondBtn"),
+  colorPicker: $("#colorPicker"),
+  colorEventInput: $("#colorEventInput"),
+  colorSaveBtn: $("#colorSaveBtn"),
+  colorCancelBtn: $("#colorCancelBtn"),
+  colorDeleteBtn: $("#colorDeleteBtn"),
+  symbolPopover: $("#symbolPopover"),
+  installButton: $("#installButton"),
+  accessHint: $("#accessHint"),
+  settingsButton: $("#settingsButton"),
+  settingsOverlay: $("#settingsOverlay"),
+  settingsCloseButton: $("#settingsCloseButton"),
+  parserSelect: $("#parserSelect"),
+  apiKeyField: $("#apiKeyField"),
+  apiKeyInput: $("#apiKeyInput"),
+  apiKeyHint: $("#apiKeyHint"),
+};
 
-const tabButtons = document.querySelectorAll(".tab-button");
-const weekPanel = document.querySelector("#weekPanel");
-const inboxPanel = document.querySelector("#inboxPanel");
+/* ================================================================
+   Tab switching
+   ================================================================ */
 
-tabButtons.forEach((btn) => {
+const allPanels = {
+  inbox: $("#inboxPanel"),
+  week: $("#weekPanel"),
+  month: $("#monthPanel"),
+  year: $("#yearPanel"),
+};
+
+$$(".tab-button").forEach((btn) => {
   btn.addEventListener("click", () => {
     const tab = btn.dataset.tab;
-    tabButtons.forEach((b) => b.classList.remove("active"));
+    $$(".tab-button").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
+    Object.entries(allPanels).forEach(([k, el]) => { el.hidden = k !== tab; });
 
-    if (tab === "week") {
-      weekPanel.hidden = false;
-      inboxPanel.hidden = true;
-      pageTitle.textContent = "本周";
-    } else {
-      weekPanel.hidden = true;
-      inboxPanel.hidden = false;
-      pageTitle.textContent = "收件箱";
-    }
+    const titles = { inbox: "收件箱", week: "本周", month: "月视图", year: "年视图" };
+    dom.pageTitle.textContent = titles[tab] || "";
+
+    if (tab === "week") renderWeek();
+    if (tab === "month") renderMonth();
+    if (tab === "year") renderYear();
   });
 });
 
-/* ---------- Today sheet ---------- */
+/* ================================================================
+   Inbox (parse / draft / confirm)
+   ================================================================ */
 
-const todayBackdrop = document.querySelector("#todayBackdrop");
-const todaySheet = document.querySelector("#todaySheet");
-const todayCloseButton = document.querySelector("#todayCloseButton");
-
-function openTodaySheet() {
-  todayBackdrop.hidden = false;
-  todaySheet.hidden = false;
-  renderTodaySheet();
-}
-
-function closeTodaySheet() {
-  todayBackdrop.hidden = true;
-  todaySheet.hidden = true;
-}
-
-todayCloseButton.addEventListener("click", closeTodaySheet);
-todayBackdrop.addEventListener("click", (e) => {
-  if (e.target === todayBackdrop) closeTodaySheet();
-});
-
-/* ---------- Parse ---------- */
-
-parseButton.addEventListener("click", async () => {
-  const text = noticeInput.value.trim();
-  if (!text) {
-    noticeInput.focus();
-    return;
-  }
-
+dom.parseButton.addEventListener("click", async () => {
+  const text = dom.noticeInput.value.trim();
+  if (!text) { dom.noticeInput.focus(); return; }
   try {
-    parseButton.disabled = true;
-    parseButton.textContent = "解析中…";
+    dom.parseButton.disabled = true;
+    dom.parseButton.textContent = "解析中…";
     const parser = getActiveParser();
     state.draft = await parser.parse(text);
     renderDraft();
   } catch (err) {
     alert(`解析失败：${err.message}`);
   } finally {
-    parseButton.disabled = false;
-    parseButton.textContent = "解析";
+    dom.parseButton.disabled = false;
+    dom.parseButton.textContent = "解析";
   }
 });
 
-pasteButton.addEventListener("click", async () => {
-  if (!navigator.clipboard?.readText) {
-    pasteButton.textContent = "手动粘贴";
-    return;
-  }
-  try {
-    noticeInput.value = await navigator.clipboard.readText();
-    noticeInput.focus();
-  } catch {
-    pasteButton.textContent = "手动粘贴";
-  }
+dom.pasteButton.addEventListener("click", async () => {
+  if (!navigator.clipboard?.readText) { dom.pasteButton.textContent = "手动粘贴"; return; }
+  try { dom.noticeInput.value = await navigator.clipboard.readText(); dom.noticeInput.focus(); }
+  catch { dom.pasteButton.textContent = "手动粘贴"; }
 });
 
-/* ---------- Confirm / Ignore ---------- */
-
-createButton.addEventListener("click", () => {
-  const rows = [...draftList.querySelectorAll(".draft-row")];
-  const bullets = rows
-    .map((row) => ({
-      id: createId(),
-      symbol: row.querySelector(".draft-symbol").value,
-      text: row.querySelector(".draft-text").value.trim(),
-      dateKey: row.querySelector(".draft-date").value,
-      source: state.draft?.source || "",
-      createdAt: new Date().toISOString(),
-    }))
-    .filter((item) => item.text);
+dom.createButton.addEventListener("click", () => {
+  const rows = [...dom.draftList.querySelectorAll(".draft-row")];
+  const bullets = rows.map((row) => ({
+    id: createId(),
+    symbol: row.querySelector(".draft-symbol").value,
+    text: row.querySelector(".draft-text").value.trim(),
+    dateKey: row.querySelector(".draft-date").value,
+    source: state.draft?.source || "",
+    createdAt: new Date().toISOString(),
+  })).filter((item) => item.text);
 
   state.bullets.unshift(...bullets);
-  saveBullets();
+  saveJson(STORAGE_KEY, state.bullets);
   clearDraft();
   renderWeek();
 });
 
-ignoreButton.addEventListener("click", clearDraft);
-
-/* ---------- Quick add (today sheet) ---------- */
-
-quickAddForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const text = quickText.value.trim();
-  if (!text) {
-    quickText.focus();
-    return;
-  }
-
-  state.bullets.unshift({
-    id: createId(),
-    symbol: quickSymbol.value,
-    text,
-    dateKey: todayKey(),
-    source: "手动记录",
-    createdAt: new Date().toISOString(),
-  });
-  quickText.value = "";
-  saveBullets();
-  renderTodaySheet();
-  renderWeek();
-});
-
-/* ---------- Week todo quick add ---------- */
-
-function addWeekTodo() {
-  const text = prompt("添加一条本周待办：");
-  if (!text || !text.trim()) return;
-
-  state.bullets.unshift({
-    id: createId(),
-    symbol: "•",
-    text: text.trim(),
-    dateKey: "",
-    source: "手动记录",
-    createdAt: new Date().toISOString(),
-  });
-  saveBullets();
-  renderWeek();
-}
-
-/* ---------- PWA install ---------- */
-
-window.addEventListener("beforeinstallprompt", (event) => {
-  event.preventDefault();
-  state.deferredInstallPrompt = event;
-  installButton.hidden = false;
-});
-
-installButton.addEventListener("click", async () => {
-  if (!state.deferredInstallPrompt) return;
-  state.deferredInstallPrompt.prompt();
-  await state.deferredInstallPrompt.userChoice;
-  state.deferredInstallPrompt = null;
-});
-
-/* ---------- Settings ---------- */
-
-const settingsButton = document.querySelector("#settingsButton");
-const settingsOverlay = document.querySelector("#settingsOverlay");
-const settingsCloseButton = document.querySelector("#settingsCloseButton");
-const parserSelect = document.querySelector("#parserSelect");
-const apiKeyField = document.querySelector("#apiKeyField");
-const apiKeyInput = document.querySelector("#apiKeyInput");
-const apiKeyHint = document.querySelector("#apiKeyHint");
-
-function openSettings() {
-  parserSelect.value = getActiveParserId();
-  apiKeyInput.value = localStorage.getItem("bullet-journal-planner:deepseek-key") || "";
-  apiKeyField.hidden = parserSelect.value !== "deepseek";
-  settingsOverlay.hidden = false;
-  updateApiKeyHint();
-}
-
-function closeSettings() {
-  settingsOverlay.hidden = true;
-}
-
-settingsButton.addEventListener("click", openSettings);
-settingsCloseButton.addEventListener("click", closeSettings);
-settingsOverlay.addEventListener("click", (e) => {
-  if (e.target === settingsOverlay) closeSettings();
-});
-
-parserSelect.addEventListener("change", () => {
-  setActiveParserId(parserSelect.value);
-  apiKeyField.hidden = parserSelect.value !== "deepseek";
-  updateApiKeyHint();
-});
-
-apiKeyInput.addEventListener("input", () => {
-  localStorage.setItem("bullet-journal-planner:deepseek-key", apiKeyInput.value.trim());
-  updateApiKeyHint();
-});
-
-function updateApiKeyHint() {
-  const key = apiKeyInput.value.trim();
-  if (!key) {
-    apiKeyHint.textContent = "尚未设置 Key，将无法使用 AI 解析。";
-  } else if (key.startsWith("sk-")) {
-    apiKeyHint.textContent = "Key 已保存。";
-  } else {
-    apiKeyHint.textContent = "Key 格式可能不正确（通常以 sk- 开头）。";
-  }
-}
-
-/* ---------- Service Worker ---------- */
-
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").catch(() => {});
-}
-
-/* ---------- Init ---------- */
-
-renderAccessHint();
-renderLegend();
-renderWeek();
-
-/* ---------- Render: Draft ---------- */
+dom.ignoreButton.addEventListener("click", clearDraft);
 
 function renderDraft() {
-  reviewPanel.hidden = false;
-  const parserName = getActiveParser().name;
-  confidenceBadge.textContent = `${parserName} · 像任务 ${state.draft.confidence}%`;
-  sourceText.textContent = state.draft.source;
-  draftList.replaceChildren();
+  dom.reviewPanel.hidden = false;
+  dom.confidenceBadge.textContent = `${getActiveParser().name} · 像任务 ${state.draft.confidence}%`;
+  dom.sourceText.textContent = state.draft.source;
+  dom.draftList.replaceChildren();
 
   state.draft.bullets.forEach((bullet) => {
-    const node = draftTemplate.content.firstElementChild.cloneNode(true);
+    const tmpl = document.querySelector("#draftTemplate");
+    const node = tmpl.content.firstElementChild.cloneNode(true);
     node.querySelector(".draft-symbol").value = bullet.symbol;
     node.querySelector(".draft-text").value = bullet.text;
     node.querySelector(".draft-date").value = bullet.dateKey;
-
-    const removeBtn = node.querySelector(".draft-remove");
-    removeBtn.addEventListener("click", () => {
+    node.querySelector(".draft-remove").addEventListener("click", () => {
       node.remove();
-      if (!draftList.children.length) clearDraft();
+      if (!dom.draftList.children.length) clearDraft();
     });
-
-    draftList.append(node);
+    dom.draftList.append(node);
   });
-
-  reviewPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  dom.reviewPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function clearDraft() {
   state.draft = null;
-  reviewPanel.hidden = true;
-  noticeInput.value = "";
-  draftList.replaceChildren();
+  dom.reviewPanel.hidden = true;
+  dom.noticeInput.value = "";
+  dom.draftList.replaceChildren();
 }
 
-/* ---------- Render: Week ---------- */
+/* ================================================================
+   Week view
+   ================================================================ */
+
+dom.weekPrev.addEventListener("click", () => { state.weekOffset--; renderWeek(); });
+dom.weekNext.addEventListener("click", () => { state.weekOffset++; renderWeek(); });
+
+dom.todayCloseButton.addEventListener("click", closeTodaySheet);
+dom.todayBackdrop.addEventListener("click", (e) => { if (e.target === dom.todayBackdrop) closeTodaySheet(); });
+
+function closeTodaySheet() {
+  dom.todayBackdrop.hidden = true;
+  dom.todaySheet.hidden = true;
+}
+
+function openTodaySheet() {
+  dom.todayBackdrop.hidden = false;
+  dom.todaySheet.hidden = false;
+  renderTodaySheet();
+}
+
+function getWeekBase() {
+  const now = new Date();
+  now.setDate(now.getDate() + state.weekOffset * 7);
+  const day = now.getDay() || 7;
+  return addDays(now, 1 - day);
+}
 
 function renderWeek() {
-  const days = weekDays();
-  const today = todayKey();
-  weekRange.textContent = `${formatMonthDay(days[0].date)} - ${formatMonthDay(days[6].date)}`;
-  weekGrid.replaceChildren();
-
-  // 一周待办框
-  const todoBox = document.createElement("section");
-  todoBox.className = "week-todo";
-  const todoHeader = document.createElement("div");
-  todoHeader.className = "week-todo-header";
-  todoHeader.innerHTML = `<span>一周待办</span>`;
-  const todoAddBtn = document.createElement("button");
-  todoAddBtn.className = "week-todo-add";
-  todoAddBtn.textContent = "+";
-  todoAddBtn.title = "添加";
-  todoAddBtn.addEventListener("click", addWeekTodo);
-  todoHeader.append(todoAddBtn);
-
-  const todoList = document.createElement("div");
-  todoList.className = "day-list";
-  const weekBullets = state.bullets.filter((item) => !item.dateKey);
-  if (weekBullets.length) {
-    weekBullets.forEach((bullet) => todoList.append(createBulletNode(bullet, "compact")));
-  } else {
-    const empty = document.createElement("p");
-    empty.className = "empty-state";
-    empty.textContent = "暂无待办。";
-    todoList.append(empty);
+  const base = getWeekBase();
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(base, i);
+    days.push({
+      weekday: `周${"一二三四五六日"[i]}`,
+      date,
+      key: dateKeyFromDate(date),
+    });
   }
-  todoBox.append(todoHeader, todoList);
-  weekGrid.append(todoBox);
+
+  const today = todayKey();
+  dom.weekRange.textContent = `${formatMonthDay(days[0].date)} - ${formatMonthDay(days[6].date)}`;
+  dom.weekGrid.replaceChildren();
+
+  // 一周待办
+  const todoBox = mkEl("section", { className: "week-todo" });
+  const todoHdr = mkEl("div", { className: "week-todo-header", innerHTML: "<span>一周待办</span>" });
+  const todoAdd = mkEl("button", { className: "week-todo-add", textContent: "+", title: "添加" });
+  todoAdd.addEventListener("click", () => {
+    const txt = prompt("添加一条本周待办：");
+    if (txt?.trim()) {
+      state.bullets.unshift({ id: createId(), symbol: "•", text: txt.trim(), dateKey: "", source: "手动记录", createdAt: new Date().toISOString() });
+      saveJson(STORAGE_KEY, state.bullets);
+      renderWeek();
+    }
+  });
+  todoHdr.append(todoAdd);
+  const todoList = mkEl("div", { className: "day-list" });
+  const weekBullets = state.bullets.filter((b) => !b.dateKey);
+  if (weekBullets.length) {
+    weekBullets.forEach((b) => todoList.append(createBulletNode(b, "compact")));
+  } else {
+    todoList.append(mkEl("p", { className: "empty-state", textContent: "暂无待办。" }));
+  }
+  todoBox.append(todoHdr, todoList);
+  dom.weekGrid.append(todoBox);
 
   // 7 天
   days.forEach((day) => {
-    const box = document.createElement("section");
-    box.className = `day-box${day.key === today ? " today" : ""}`;
-    const title = document.createElement("div");
-    title.className = "day-title";
-    title.innerHTML = `<span>${day.weekday}</span><span>${formatMonthDay(day.date)}</span>`;
-    const list = document.createElement("div");
-    list.className = "day-list";
-    const bullets = state.bullets.filter((item) => item.dateKey === day.key);
+    const box = mkEl("section", { className: `day-box${day.key === today ? " today" : ""}` });
+    const title = mkEl("div", { className: "day-title", innerHTML: `<span>${day.weekday}</span><span>${formatMonthDay(day.date)}</span>` });
+    const list = mkEl("div", { className: "day-list" });
+    const bullets = state.bullets.filter((b) => b.dateKey === day.key);
     if (bullets.length) {
-      bullets.forEach((bullet) => list.append(createBulletNode(bullet, "compact")));
+      bullets.forEach((b) => list.append(createBulletNode(b, "compact")));
     } else {
-      const empty = document.createElement("p");
-      empty.className = "empty-state";
-      empty.textContent = " ";
-      list.append(empty);
+      list.append(mkEl("p", { className: "empty-state", textContent: " " }));
     }
     box.append(title, list);
 
@@ -361,140 +301,533 @@ function renderWeek() {
       });
     }
 
-    weekGrid.append(box);
+    dom.weekGrid.append(box);
   });
 }
 
-/* ---------- Render: Today Sheet ---------- */
+/* ================================================================
+   Today sheet
+   ================================================================ */
+
+dom.quickAddForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const text = dom.quickText.value.trim();
+  if (!text) { dom.quickText.focus(); return; }
+  state.bullets.unshift({
+    id: createId(), symbol: dom.quickSymbol.value,
+    text, dateKey: todayKey(), source: "手动记录", createdAt: new Date().toISOString(),
+  });
+  dom.quickText.value = "";
+  saveJson(STORAGE_KEY, state.bullets);
+  renderTodaySheet();
+  renderWeek();
+});
 
 function renderTodaySheet() {
-  todayDate.textContent = formatFullDate(new Date());
-  const todayBullets = state.bullets.filter((item) => item.dateKey === todayKey());
-  todayList.replaceChildren();
+  dom.todayDate.textContent = formatFullDate(new Date());
+  const bullets = state.bullets.filter((b) => b.dateKey === todayKey());
+  dom.todayList.replaceChildren();
 
-  if (!todayBullets.length) {
-    const empty = document.createElement("p");
-    empty.className = "empty-state";
-    empty.textContent = "今天还没有子弹。可以手动记录，或从通知解析后确认加入。";
-    todayList.append(empty);
+  if (!bullets.length) {
+    dom.todayList.append(mkEl("p", { className: "empty-state", textContent: "今天还没有子弹。" }));
     return;
   }
-
-  todayBullets.forEach((bullet) => todayList.append(createBulletNode(bullet, "today")));
+  bullets.forEach((b) => dom.todayList.append(createBulletNode(b, "today")));
 }
 
-/* ---------- Create Bullet Node ---------- */
+/* ================================================================
+   Month view
+   ================================================================ */
 
-function createBulletNode(bullet, mode) {
-  const node = bulletTemplate.content.firstElementChild.cloneNode(true);
-  const symbolButton = node.querySelector(".bullet-symbol");
-  const textInput = node.querySelector(".bullet-text");
-  const meta = node.querySelector(".bullet-meta");
-  const migrateButton = node.querySelector(".migrate-button");
-  const deleteButton = node.querySelector(".delete-button");
+function getMonthBase() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + state.monthOffset, 1);
+}
 
-  node.classList.toggle("done", bullet.symbol === "×");
-  symbolButton.textContent = bullet.symbol;
-  textInput.value = bullet.text;
+dom.monthPrev.addEventListener("click", () => { state.monthOffset--; renderMonth(); });
+dom.monthNext.addEventListener("click", () => { state.monthOffset++; renderMonth(); });
 
-  if (bullet.dateKey) {
-    meta.textContent = [formatDateKey(bullet.dateKey), bullet.source && bullet.source !== "手动记录" ? "来自通知" : ""]
-      .filter(Boolean)
-      .join(" · ");
+dom.monthTodoBtn.addEventListener("click", () => { dom.monthTodoPanel.hidden = false; dom.monthTodoBackdrop.hidden = false; renderMonthTodos(); });
+dom.monthTodoBackdrop.addEventListener("click", () => { dom.monthTodoPanel.hidden = true; dom.monthTodoBackdrop.hidden = true; });
+
+function renderMonth() {
+  const base = getMonthBase();
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow = new Date(year, month, 1).getDay();
+
+  dom.monthTitle.textContent = `${month + 1}月 ${year}`;
+  dom.monthLayout.replaceChildren();
+
+  const dateCol = mkEl("div", { className: "month-date-col" });
+  const taskCol = mkEl("div", { className: "month-task-col" });
+
+  let prevWeek = -1;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month, d);
+    const weekOfMonth = Math.floor((d + firstDow - 1) / 7);
+    const dayOfWeek = date.getDay();
+
+    const isWeekDivider = d > 1 && weekOfMonth !== prevWeek;
+    prevWeek = weekOfMonth;
+
+    // Date column
+    const dateRow = mkEl("div", { className: `month-date-row${isWeekDivider ? " week-divider" : ""}` });
+    dateRow.innerHTML = `<span class="date-num">${d}</span><span class="date-dow">${DOWS[dayOfWeek]}</span>`;
+    dateCol.append(dateRow);
+
+    // Task column
+    const dateKey = toDateKey(year, month + 1, d);
+    const dayBullets = state.bullets.filter((b) => b.dateKey === dateKey);
+    const taskRow = mkEl("div", { className: `month-task-row${isWeekDivider ? " week-divider" : ""}` });
+
+    if (dayBullets.length) {
+      dayBullets.forEach((b) => taskRow.append(createBulletNode(b, "compact")));
+    }
+    taskCol.append(taskRow);
   }
 
-  symbolButton.addEventListener("click", () => {
-    bullet.symbol = bullet.symbol === "×" ? "•" : "×";
-    saveBullets();
+  dom.monthLayout.append(dateCol, taskCol);
+}
+
+/* Monthly todo panel */
+
+$$(".month-todo-input").forEach((inp) => {
+  inp.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && inp.value.trim()) {
+      const cat = inp.dataset.cat;
+      state.monthlyTodos.push({
+        id: createId(), symbol: "•", text: inp.value.trim(),
+        category: cat, month: monthKey(), createdAt: new Date().toISOString(),
+      });
+      inp.value = "";
+      saveJson(MONTHLY_KEY, state.monthlyTodos);
+      renderMonthTodos();
+    }
+  });
+});
+
+function monthKey() {
+  const base = getMonthBase();
+  return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function renderMonthTodos() {
+  const key = monthKey();
+  const todos = state.monthlyTodos.filter((t) => t.month === key);
+
+  const cats = { "生活": dom.mtodoLife, "学业": dom.mtodoStudy, "工作": dom.mtodoWork };
+  Object.values(cats).forEach((el) => { el.replaceChildren(); });
+
+  todos.forEach((todo) => {
+    const catEl = cats[todo.category];
+    if (!catEl) return;
+    const tmpl = document.querySelector("#monthTodoTemplate");
+    const node = tmpl.content.firstElementChild.cloneNode(true);
+    const symBtn = node.querySelector(".bullet-symbol");
+    const txtInp = node.querySelector(".bullet-text");
+    const delBtn = node.querySelector(".delete-button");
+
+    symBtn.textContent = todo.symbol;
+    txtInp.value = todo.text;
+    node.classList.toggle("done", todo.symbol === "×");
+
+    symBtn.addEventListener("click", () => {
+      todo.symbol = todo.symbol === "×" ? "•" : "×";
+      saveJson(MONTHLY_KEY, state.monthlyTodos);
+      renderMonthTodos();
+    });
+    txtInp.addEventListener("change", () => {
+      todo.text = txtInp.value.trim() || todo.text;
+      saveJson(MONTHLY_KEY, state.monthlyTodos);
+    });
+    delBtn.addEventListener("click", () => {
+      state.monthlyTodos = state.monthlyTodos.filter((t) => t.id !== todo.id);
+      saveJson(MONTHLY_KEY, state.monthlyTodos);
+      renderMonthTodos();
+    });
+    catEl.append(node);
+  });
+}
+
+/* ================================================================
+   Year view
+   ================================================================ */
+
+dom.yearPrev.addEventListener("click", () => { state.viewYear--; renderYear(); });
+dom.yearNext.addEventListener("click", () => { state.viewYear++; renderYear(); });
+
+dom.halfFirstBtn.addEventListener("click", () => { state.half = "first"; dom.halfFirstBtn.classList.add("active"); dom.halfSecondBtn.classList.remove("active"); renderYear(); });
+dom.halfSecondBtn.addEventListener("click", () => { state.half = "second"; dom.halfSecondBtn.classList.add("active"); dom.halfFirstBtn.classList.remove("active"); renderYear(); });
+
+dom.colorCancelBtn.addEventListener("click", () => { dom.colorPicker.hidden = true; state.pendingYearEvent = null; });
+dom.colorDeleteBtn.addEventListener("click", () => {
+  if (state.pendingYearEvent?.eventId) {
+    state.yearlyEvents = state.yearlyEvents.filter((e) => e.id !== state.pendingYearEvent.eventId);
+    saveJson(YEARLY_KEY, state.yearlyEvents);
+  }
+  dom.colorPicker.hidden = true;
+  state.pendingYearEvent = null;
+  renderYear();
+});
+
+dom.colorSaveBtn.addEventListener("click", () => {
+  const text = dom.colorEventInput.value.trim();
+  if (!text || !state.pendingYearEvent) return;
+  const { startDate, color } = state.pendingYearEvent;
+
+  if (state.pendingYearEvent.eventId) {
+    // editing existing
+    const evt = state.yearlyEvents.find((e) => e.id === state.pendingYearEvent.eventId);
+    if (evt) { evt.text = text; evt.color = color; }
+  } else {
+    state.yearlyEvents.push({ id: createId(), color, text, startDate, endDate: null, year: state.viewYear });
+  }
+  saveJson(YEARLY_KEY, state.yearlyEvents);
+  dom.colorPicker.hidden = true;
+  state.pendingYearEvent = null;
+  renderYear();
+});
+
+function getMonthsForHalf() {
+  return state.half === "first" ? [0, 1, 2, 3, 4, 5] : [6, 7, 8, 9, 10, 11];
+}
+
+function renderYear() {
+  dom.yearTitle.textContent = state.viewYear;
+  dom.yearGrid.replaceChildren();
+
+  const months = getMonthsForHalf();
+
+  months.forEach((m) => {
+    const card = mkEl("div", { className: "year-month-card" });
+    const nameRow = mkEl("div", { className: "year-month-name", textContent: `${m + 1}月` });
+    card.append(nameRow);
+
+    // Mini calendar
+    const miniCal = mkEl("div", { className: "mini-cal" });
+    // Day headers
+    ["日","一","二","三","四","五","六"].forEach((dh) => {
+      miniCal.append(mkEl("div", { className: "mini-day-header", textContent: dh }));
+    });
+
+    const daysInMonth = new Date(state.viewYear, m + 1, 0).getDate();
+    const firstDow = new Date(state.viewYear, m, 1).getDay();
+
+    // Empty cells before first day
+    for (let i = 0; i < firstDow; i++) {
+      miniCal.append(mkEl("div", { className: "mini-day empty" }));
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateKey = toDateKey(state.viewYear, m + 1, d);
+      const cell = mkEl("div", { className: "mini-day", textContent: String(d) });
+
+      // Check for year events on this day
+      const dayEvents = state.yearlyEvents.filter((e) => {
+        if (e.startDate > dateKey) return false;
+        if (e.endDate && e.endDate < dateKey) return false;
+        if (!e.endDate && e.startDate !== dateKey) return false;
+        return e.year === state.viewYear;
+      });
+
+      dayEvents.forEach((evt) => {
+        const isStart = evt.startDate === dateKey;
+        const isEnd = evt.endDate === dateKey;
+        const isSingle = !evt.endDate || evt.startDate === evt.endDate;
+        let cls = "bar ";
+        if (isSingle) cls += "single";
+        else if (isStart) cls += "start";
+        else if (isEnd) cls += "end";
+        else cls += "mid";
+
+        const bar = mkEl("div", { className: cls });
+        bar.style.backgroundColor = evt.color;
+        cell.append(bar);
+
+        if (isStart || isSingle) {
+          const dot = mkEl("div", { className: "dot" });
+          dot.style.backgroundColor = evt.color;
+          cell.append(dot);
+        }
+      });
+
+      cell.addEventListener("click", () => openYearEventPicker(dateKey));
+      miniCal.append(cell);
+    }
+
+    card.append(miniCal);
+
+    // Events list below calendar
+    const eventsList = mkEl("div", { className: "year-events-list" });
+    const monthEvents = state.yearlyEvents.filter((e) => {
+      const startM = parseInt(e.startDate.split("-")[1]) - 1;
+      return startM === m && e.year === state.viewYear;
+    });
+    monthEvents.forEach((evt) => {
+      const item = mkEl("div", { className: "year-event-item" });
+      const dot = mkEl("div", { className: "year-event-dot" });
+      dot.style.backgroundColor = evt.color;
+      const txt = mkEl("span", { className: "year-event-text" });
+      const dateStr = evt.endDate ? `${formatShort(e.startDate)}-${formatShort(evt.endDate)}` : formatShort(e.startDate);
+      txt.innerHTML = `<strong>${evt.text}</strong> ${dateStr}`;
+      item.append(dot, txt);
+      item.addEventListener("click", () => openYearEventPicker(evt.startDate, evt));
+      eventsList.append(item);
+    });
+    card.append(eventsList);
+    dom.yearGrid.append(card);
+  });
+}
+
+function openYearEventPicker(dateKey, existingEvent) {
+  dom.colorPicker.hidden = false;
+  dom.colorEventInput.value = existingEvent?.text || "";
+  dom.colorDeleteBtn.hidden = !existingEvent;
+
+  state.pendingYearEvent = existingEvent
+    ? { startDate: existingEvent.startDate, color: existingEvent.color, eventId: existingEvent.id }
+    : { startDate: dateKey, color: YEAR_COLORS[0] };
+
+  updateColorPickerUI();
+}
+
+function updateColorPickerUI() {
+  $$(".color-dot").forEach((dot) => {
+    dot.classList.toggle("selected", dot.dataset.color === state.pendingYearEvent?.color);
+  });
+}
+
+$$(".color-dot").forEach((dot) => {
+  dot.addEventListener("click", () => {
+    if (state.pendingYearEvent) {
+      state.pendingYearEvent.color = dot.dataset.color;
+      updateColorPickerUI();
+    }
+  });
+});
+
+/* ================================================================
+   Bullet node + Symbol popover
+   ================================================================ */
+
+function createBulletNode(bullet, mode) {
+  const tmpl = document.querySelector("#bulletTemplate");
+  const node = tmpl.content.firstElementChild.cloneNode(true);
+  const symBtn = node.querySelector(".bullet-symbol");
+  const txtInp = node.querySelector(".bullet-text");
+  const meta = node.querySelector(".bullet-meta");
+  const migBtn = node.querySelector(".migrate-button");
+  const delBtn = node.querySelector(".delete-button");
+
+  node.classList.toggle("done", bullet.symbol === "×");
+  node.classList.toggle("shelved", bullet.symbol === "<");
+  node.classList.toggle("important", bullet.symbol === "*");
+  symBtn.textContent = bullet.symbol;
+  txtInp.value = bullet.text;
+
+  if (bullet.dateKey) {
+    meta.textContent = [formatDateKey(bullet.dateKey), bullet.source && bullet.source !== "手动记录" ? "来自通知" : ""].filter(Boolean).join(" · ");
+  }
+
+  /* Symbol button → popover */
+  symBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    state.activePopoverBullet = bullet;
+    showSymbolPopover(symBtn);
+  });
+
+  txtInp.addEventListener("change", () => {
+    bullet.text = txtInp.value.trim() || bullet.text;
+    saveJson(STORAGE_KEY, state.bullets);
     renderAll();
   });
 
-  textInput.addEventListener("change", () => {
-    bullet.text = textInput.value.trim() || bullet.text;
-    saveBullets();
-    renderAll();
-  });
-
-  migrateButton.addEventListener("click", () => {
+  /* Migrate button in today sheet */
+  migBtn.addEventListener("click", () => {
     bullet.symbol = ">";
-    bullet.dateKey = dateKeyFromDate(addDays(new Date(`${bullet.dateKey}T00:00:00`), 1));
-    saveBullets();
+    bullet.dateKey = dateKeyFromDate(addDays(new Date(bullet.dateKey + "T00:00:00"), 1));
+    saveJson(STORAGE_KEY, state.bullets);
     renderAll();
   });
 
-  deleteButton.addEventListener("click", () => {
-    state.bullets = state.bullets.filter((item) => item.id !== bullet.id);
-    saveBullets();
+  delBtn.addEventListener("click", () => {
+    state.bullets = state.bullets.filter((b) => b.id !== bullet.id);
+    saveJson(STORAGE_KEY, state.bullets);
     renderAll();
   });
 
-  // 长按显示操作按钮（移动端）
+  // Long press for mobile
   let pressTimer;
   node.addEventListener("touchstart", () => {
-    pressTimer = setTimeout(() => {
-      migrateButton.style.opacity = "1";
-      deleteButton.style.opacity = "1";
-    }, 500);
+    pressTimer = setTimeout(() => { migBtn.style.opacity = "1"; delBtn.style.opacity = "1"; }, 500);
   }, { passive: true });
   node.addEventListener("touchend", () => clearTimeout(pressTimer));
   node.addEventListener("touchmove", () => clearTimeout(pressTimer));
 
   if (mode === "compact") {
-    migrateButton.hidden = true;
-    deleteButton.hidden = true;
+    migBtn.hidden = true;
+    delBtn.hidden = true;
   }
 
   return node;
 }
 
-function renderAll() {
-  renderWeek();
-  if (!todaySheet.hidden) renderTodaySheet();
+/* Symbol popover */
+
+function showSymbolPopover(anchor) {
+  const rect = anchor.getBoundingClientRect();
+  dom.symbolPopover.hidden = false;
+  dom.symbolPopover.style.top = `${rect.bottom + 4}px`;
+  dom.symbolPopover.style.left = `${Math.min(rect.left, window.innerWidth - 140)}px`;
 }
 
-/* ---------- Legend ---------- */
+function hideSymbolPopover() {
+  dom.symbolPopover.hidden = true;
+  state.activePopoverBullet = null;
+}
+
+$$(".symbol-option").forEach((opt) => {
+  opt.addEventListener("click", () => {
+    const bullet = state.activePopoverBullet;
+    if (!bullet) return;
+    const sym = opt.dataset.sym;
+
+    if (sym === "×") { bullet.symbol = "×"; }
+    else if (sym === ">") {
+      bullet.symbol = ">";
+      bullet.dateKey = dateKeyFromDate(addDays(new Date(bullet.dateKey + "T00:00:00"), 1));
+    }
+    else if (sym === "<") { bullet.symbol = "<"; }
+    else if (sym === "–") { bullet.symbol = "–"; }
+    else if (sym === "*") { bullet.symbol = "*"; }
+    else if (sym === "•") { bullet.symbol = "•"; }
+
+    saveJson(STORAGE_KEY, state.bullets);
+    hideSymbolPopover();
+    renderAll();
+  });
+});
+
+document.addEventListener("click", (e) => {
+  if (!dom.symbolPopover.hidden && !dom.symbolPopover.contains(e.target)) {
+    hideSymbolPopover();
+  }
+});
+
+/* ================================================================
+   Render helpers
+   ================================================================ */
+
+function renderAll() {
+  renderWeek();
+  if (!dom.todaySheet.hidden) renderTodaySheet();
+  if (!dom.monthPanel.hidden) renderMonth();
+  if (!dom.yearPanel.hidden) renderYear();
+}
 
 function renderLegend() {
-  legendList.replaceChildren();
-  symbols.forEach((item) => {
-    const chip = document.createElement("span");
-    chip.className = "legend-chip";
+  dom.legendList.replaceChildren();
+  SYMBOLS.forEach((item) => {
+    const chip = mkEl("span", { className: "legend-chip" });
     chip.innerHTML = `<strong>${item.value}</strong>${item.label}`;
-    legendList.append(chip);
+    dom.legendList.append(chip);
   });
 }
 
-/* ---------- Storage ---------- */
+/* ================================================================
+   Settings
+   ================================================================ */
 
-function loadBullets() {
-  try {
-    const current = JSON.parse(localStorage.getItem(storageKey));
-    if (Array.isArray(current)) return current;
-  } catch {}
-
-  try {
-    const legacy = JSON.parse(localStorage.getItem(legacyStorageKey)) || [];
-    return legacy.map((task) => ({
-      id: task.id || createId(),
-      symbol: task.done ? "×" : "•",
-      text: task.what || task.title || "未命名任务",
-      dateKey: todayKey(),
-      source: task.note || "",
-      createdAt: task.createdAt || new Date().toISOString(),
-    }));
-  } catch {
-    return [];
-  }
+function openSettings() {
+  dom.parserSelect.value = getActiveParserId();
+  dom.apiKeyInput.value = localStorage.getItem("bullet-journal-planner:deepseek-key") || "";
+  dom.apiKeyField.hidden = dom.parserSelect.value !== "deepseek";
+  dom.settingsOverlay.hidden = false;
+  updateApiKeyHint();
 }
 
-function saveBullets() {
-  localStorage.setItem(storageKey, JSON.stringify(state.bullets));
+function closeSettings() { dom.settingsOverlay.hidden = true; }
+
+dom.settingsButton.addEventListener("click", openSettings);
+dom.settingsCloseButton.addEventListener("click", closeSettings);
+dom.settingsOverlay.addEventListener("click", (e) => { if (e.target === dom.settingsOverlay) closeSettings(); });
+
+dom.parserSelect.addEventListener("change", () => {
+  setActiveParserId(dom.parserSelect.value);
+  dom.apiKeyField.hidden = dom.parserSelect.value !== "deepseek";
+  updateApiKeyHint();
+});
+
+dom.apiKeyInput.addEventListener("input", () => {
+  localStorage.setItem("bullet-journal-planner:deepseek-key", dom.apiKeyInput.value.trim());
+  updateApiKeyHint();
+});
+
+function updateApiKeyHint() {
+  const key = dom.apiKeyInput.value.trim();
+  if (!key) dom.apiKeyHint.textContent = "尚未设置 Key，将无法使用 AI 解析。";
+  else if (key.startsWith("sk-")) dom.apiKeyHint.textContent = "Key 已保存。";
+  else dom.apiKeyHint.textContent = "Key 格式可能不正确（通常以 sk- 开头）。";
+}
+
+/* ================================================================
+   PWA
+   ================================================================ */
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  state.deferredInstallPrompt = event;
+  dom.installButton.hidden = false;
+});
+
+dom.installButton.addEventListener("click", async () => {
+  if (!state.deferredInstallPrompt) return;
+  state.deferredInstallPrompt.prompt();
+  await state.deferredInstallPrompt.userChoice;
+  state.deferredInstallPrompt = null;
+});
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+}
+
+/* ================================================================
+   Storage helpers
+   ================================================================ */
+
+function loadJson(key) {
+  try { const v = JSON.parse(localStorage.getItem(key)); return Array.isArray(v) ? v : null; }
+  catch { return null; }
+}
+
+function saveJson(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
+
+function migrateLegacy() {
+  try {
+    const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY)) || [];
+    return legacy.map((t) => ({
+      id: t.id || createId(), symbol: t.done ? "×" : "•",
+      text: t.what || t.title || "未命名", dateKey: todayKey(),
+      source: t.note || "", createdAt: t.createdAt || new Date().toISOString(),
+    }));
+  } catch { return []; }
 }
 
 function renderAccessHint() {
-  if (!accessHint) return;
-  accessHint.textContent =
+  if (!dom.accessHint) return;
+  dom.accessHint.textContent =
     location.hostname === "127.0.0.1" || location.hostname === "localhost"
       ? "手机访问请使用电脑的局域网 IP 地址。"
       : "任务会保存在这台设备的浏览器里。";
 }
+
+/* ================================================================
+   Init
+   ================================================================ */
+
+renderAccessHint();
+renderLegend();
+renderWeek();

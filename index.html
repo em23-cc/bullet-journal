@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f7f3ea" />
     <title>子弹计划</title>
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=8" />
+    <link rel="stylesheet" href="./styles.css?v=9" />
   </head>
   <body>
     <main class="journal-shell">
@@ -21,53 +21,6 @@
         </div>
       </header>
 
-      <!-- ====== 本周 Tab ====== -->
-      <section class="tab-panel" id="weekPanel" aria-label="本周视图">
-        <div class="page-heading">
-          <div>
-            <p class="page-kicker">Weekly Log</p>
-            <h2>本周</h2>
-          </div>
-          <p id="weekRange" class="date-range"></p>
-        </div>
-
-        <div class="week-grid" id="weekGrid"></div>
-
-        <section class="legend" id="legendSection">
-          <h3>符号</h3>
-          <div id="legendList" class="legend-list"></div>
-        </section>
-
-        <!-- 今日浮窗遮罩 -->
-        <div class="sheet-backdrop" id="todayBackdrop" hidden></div>
-
-        <!-- 今日浮窗 -->
-        <section class="today-sheet" id="todaySheet" aria-label="今日日志" hidden>
-          <div class="sheet-handle"></div>
-          <div class="sheet-head">
-            <div>
-              <p class="page-kicker">Daily Log</p>
-              <h2 id="todayTitle">今天</h2>
-            </div>
-            <p id="todayDate" class="date-range"></p>
-            <button class="icon-button sheet-close" id="todayCloseButton" type="button" aria-label="关闭">&times;</button>
-          </div>
-
-          <form class="quick-add" id="quickAddForm">
-            <select id="quickSymbol" aria-label="子弹类型">
-              <option value="•">• 任务</option>
-              <option value="○">○ 事件</option>
-              <option value="–">– 备注</option>
-              <option value="*">* 重要</option>
-            </select>
-            <input id="quickText" type="text" placeholder="快速记录..." autocomplete="off" />
-            <button class="primary-button" type="submit">加入</button>
-          </form>
-
-          <div class="daily-log" id="todayList"></div>
-        </section>
-      </section>
-
       <!-- ====== 收件箱 Tab ====== -->
       <section class="tab-panel" id="inboxPanel" aria-label="通知收件箱" hidden>
         <div class="capture-strip">
@@ -81,11 +34,7 @@
               <button class="ghost-button" id="pasteButton" type="button">粘贴</button>
             </div>
           </div>
-          <textarea
-            id="noticeInput"
-            placeholder="粘贴班群通知，解析后会拆成几条待确认的子弹任务。"
-            spellcheck="false"
-          ></textarea>
+          <textarea id="noticeInput" placeholder="粘贴班群通知，解析后会拆成几条待确认的子弹任务。" spellcheck="false"></textarea>
         </div>
 
         <section class="inbox-panel" id="reviewPanel" aria-live="polite" hidden>
@@ -104,17 +53,151 @@
           </div>
         </section>
       </section>
+
+      <!-- ====== 周 Tab ====== -->
+      <section class="tab-panel" id="weekPanel" aria-label="本周视图">
+        <div class="page-heading week-head-bar">
+          <div>
+            <p class="page-kicker">Weekly Log</p>
+            <h2>本周</h2>
+          </div>
+          <div class="week-nav">
+            <button class="nav-arrow" id="weekPrev" type="button" title="上一周">&larr;</button>
+            <span id="weekRange" class="date-range"></span>
+            <button class="nav-arrow" id="weekNext" type="button" title="下一周">&rarr;</button>
+          </div>
+        </div>
+
+        <div class="week-grid" id="weekGrid"></div>
+
+        <section class="legend" id="legendSection">
+          <h3>符号</h3>
+          <div id="legendList" class="legend-list"></div>
+        </section>
+
+        <!-- 今日浮窗 -->
+        <div class="sheet-backdrop" id="todayBackdrop" hidden></div>
+        <section class="today-sheet" id="todaySheet" aria-label="今日日志" hidden>
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
+            <div>
+              <p class="page-kicker">Daily Log</p>
+              <h2>今天</h2>
+            </div>
+            <p id="todayDate" class="date-range"></p>
+            <button class="icon-button sheet-close" id="todayCloseButton" type="button" aria-label="关闭">&times;</button>
+          </div>
+
+          <form class="quick-add" id="quickAddForm">
+            <select id="quickSymbol" aria-label="子弹类型">
+              <option value="•">• 任务</option>
+              <option value="–">– 备注</option>
+              <option value="*">* 重要</option>
+            </select>
+            <input id="quickText" type="text" placeholder="快速记录..." autocomplete="off" />
+            <button class="primary-button" type="submit">加入</button>
+          </form>
+
+          <div class="daily-log" id="todayList"></div>
+        </section>
+      </section>
+
+      <!-- ====== 月 Tab ====== -->
+      <section class="tab-panel" id="monthPanel" aria-label="月视图" hidden>
+        <div class="page-heading month-head-bar">
+          <div>
+            <p class="page-kicker">Monthly Log</p>
+            <h2 id="monthTitle">6月 2026</h2>
+          </div>
+          <div class="month-nav">
+            <button class="nav-arrow" id="monthPrev" type="button" title="上一月">&larr;</button>
+            <button class="nav-arrow" id="monthNext" type="button" title="下一月">&rarr;</button>
+            <button class="month-todo-btn" id="monthTodoBtn" type="button" title="月度待办">&gt;</button>
+          </div>
+        </div>
+
+        <div class="month-layout" id="monthLayout"></div>
+
+        <!-- 月度待办弹出 -->
+        <div class="panel-backdrop" id="monthTodoBackdrop" hidden></div>
+        <div class="month-todo-panel" id="monthTodoPanel" hidden>
+          <div class="sheet-handle"></div>
+          <h3>月度待办</h3>
+          <div class="month-todo-cat">
+            <p class="cat-label">生活</p>
+            <div class="month-todo-list" id="mtodoLife"></div>
+            <input class="month-todo-input" placeholder="添加生活待办..." data-cat="生活" />
+          </div>
+          <div class="month-todo-cat">
+            <p class="cat-label">学业</p>
+            <div class="month-todo-list" id="mtodoStudy"></div>
+            <input class="month-todo-input" placeholder="添加学业待办..." data-cat="学业" />
+          </div>
+          <div class="month-todo-cat">
+            <p class="cat-label">工作</p>
+            <div class="month-todo-list" id="mtodoWork"></div>
+            <input class="month-todo-input" placeholder="添加工作待办..." data-cat="工作" />
+          </div>
+        </div>
+      </section>
+
+      <!-- ====== 年 Tab ====== -->
+      <section class="tab-panel" id="yearPanel" aria-label="年视图" hidden>
+        <div class="page-heading">
+          <div>
+            <p class="page-kicker">Future Log</p>
+            <h2 id="yearTitle">2026</h2>
+          </div>
+          <div class="year-nav">
+            <button class="nav-arrow" id="yearPrev" type="button" title="上一年">&larr;</button>
+            <button class="nav-arrow" id="yearNext" type="button" title="下一年">&rarr;</button>
+          </div>
+        </div>
+
+        <div class="half-year-toggle">
+          <button class="half-btn active" id="halfFirstBtn" type="button">上半年</button>
+          <button class="half-btn" id="halfSecondBtn" type="button">下半年</button>
+        </div>
+
+        <div class="year-grid" id="yearGrid"></div>
+
+        <!-- 年视图选色器 -->
+        <div class="color-picker" id="colorPicker" hidden>
+          <div class="color-options">
+            <button class="color-dot" style="background:#e06c6c" data-color="#e06c6c"></button>
+            <button class="color-dot" style="background:#e0a56c" data-color="#e0a56c"></button>
+            <button class="color-dot" style="background:#d4c04a" data-color="#d4c04a"></button>
+            <button class="color-dot" style="background:#6cbe6c" data-color="#6cbe6c"></button>
+            <button class="color-dot" style="background:#6ca8e0" data-color="#6ca8e0"></button>
+            <button class="color-dot" style="background:#b06ce0" data-color="#b06ce0"></button>
+          </div>
+          <input class="color-event-input" id="colorEventInput" placeholder="事件描述..." />
+          <div class="color-picker-actions">
+            <button class="primary-button" id="colorSaveBtn" type="button">保存</button>
+            <button class="ghost-button" id="colorCancelBtn" type="button">取消</button>
+            <button class="ghost-button" id="colorDeleteBtn" type="button" hidden>删除</button>
+          </div>
+        </div>
+      </section>
     </main>
 
     <!-- ====== 底部 Tab Bar ====== -->
-    <nav class="tab-bar">
-      <button class="tab-button active" data-tab="week" aria-label="本周">
-        <span class="tab-icon">&#9702;</span>
-        <span class="tab-label">本周</span>
-      </button>
+    <nav class="tab-bar tab-bar-4">
       <button class="tab-button" data-tab="inbox" aria-label="收件箱">
         <span class="tab-icon">&#9998;</span>
         <span class="tab-label">收件箱</span>
+      </button>
+      <button class="tab-button active" data-tab="week" aria-label="周">
+        <span class="tab-icon">&#9702;</span>
+        <span class="tab-label">周</span>
+      </button>
+      <button class="tab-button" data-tab="month" aria-label="月">
+        <span class="tab-icon">&#9728;</span>
+        <span class="tab-label">月</span>
+      </button>
+      <button class="tab-button" data-tab="year" aria-label="年">
+        <span class="tab-icon">&#9733;</span>
+        <span class="tab-label">年</span>
       </button>
     </nav>
 
@@ -141,6 +224,16 @@
       </div>
     </div>
 
+    <!-- ====== 符号菜单 Popover ====== -->
+    <div class="symbol-popover" id="symbolPopover" hidden>
+      <button class="symbol-option" data-sym="×">× 完成</button>
+      <button class="symbol-option" data-sym=">">> 迁移</button>
+      <button class="symbol-option" data-sym="<">< 排期</button>
+      <button class="symbol-option" data-sym="–">– 备注</button>
+      <button class="symbol-option" data-sym="*">* 重要</button>
+      <button class="symbol-option" data-sym="•">• 任务</button>
+    </div>
+
     <!-- ====== 模板 ====== -->
     <template id="bulletTemplate">
       <article class="bullet-row">
@@ -158,7 +251,6 @@
       <article class="draft-row">
         <select class="draft-symbol" aria-label="子弹类型">
           <option value="•">•</option>
-          <option value="○">○</option>
           <option value="–">–</option>
           <option value="*">*</option>
         </select>
@@ -168,7 +260,17 @@
       </article>
     </template>
 
-    <script src="./parser.js?v=1"></script>
-    <script src="./app.js?v=10"></script>
+    <template id="monthTodoTemplate">
+      <article class="bullet-row">
+        <button class="bullet-symbol" type="button"></button>
+        <div class="bullet-main">
+          <input class="bullet-text" type="text" />
+        </div>
+        <button class="delete-button" type="button" title="删除">×</button>
+      </article>
+    </template>
+
+    <script src="./parser.js?v=2"></script>
+    <script src="./app.js?v=11"></script>
   </body>
 </html>

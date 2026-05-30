@@ -6,80 +6,51 @@
     <meta name="theme-color" content="#f7f3ea" />
     <title>子弹计划</title>
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=7" />
+    <link rel="stylesheet" href="./styles.css?v=8" />
   </head>
   <body>
     <main class="journal-shell">
       <header class="journal-header">
         <div>
           <p class="eyebrow">个人子弹计划</p>
-          <h1 id="pageTitle">本周 · 今天</h1>
+          <h1 id="pageTitle">本周</h1>
         </div>
         <div class="header-actions">
           <button class="icon-button" id="settingsButton" type="button" aria-label="设置" title="设置">&#9881;</button>
-          <button class="icon-button" id="installButton" type="button" aria-label="安装到桌面" title="安装到桌面">
-            <span aria-hidden="true">+</span>
-          </button>
+          <button class="icon-button" id="installButton" type="button" aria-label="安装到桌面" title="安装到桌面">+</button>
         </div>
       </header>
 
-      <section class="capture-strip" aria-labelledby="captureTitle">
-        <div class="capture-head">
+      <!-- ====== 本周 Tab ====== -->
+      <section class="tab-panel" id="weekPanel" aria-label="本周视图">
+        <div class="page-heading">
           <div>
-            <h2 id="captureTitle">通知收件箱</h2>
-            <p id="accessHint" class="access-hint"></p>
+            <p class="page-kicker">Weekly Log</p>
+            <h2>本周</h2>
           </div>
-          <div class="actions compact-actions">
-            <button class="primary-button" id="parseButton" type="button">解析</button>
-            <button class="ghost-button" id="pasteButton" type="button">粘贴</button>
-          </div>
+          <p id="weekRange" class="date-range"></p>
         </div>
-        <textarea
-          id="noticeInput"
-          placeholder="粘贴班群通知，解析后会拆成几条待确认的子弹任务。"
-          spellcheck="false"
-        ></textarea>
-      </section>
 
-      <section class="inbox-panel" id="reviewPanel" aria-live="polite" hidden>
-        <div class="section-heading">
-          <h2>待确认子弹</h2>
-          <span id="confidenceBadge" class="badge">待判断</span>
-        </div>
-        <div class="draft-list" id="draftList"></div>
-        <details class="source-details">
-          <summary>查看原通知</summary>
-          <p id="sourceText"></p>
-        </details>
-        <div class="actions">
-          <button class="primary-button" id="createButton" type="button">确认加入</button>
-          <button class="ghost-button" id="ignoreButton" type="button">忽略</button>
-        </div>
-      </section>
+        <div class="week-grid" id="weekGrid"></div>
 
-      <section class="spread">
-        <section class="week-page paper-page" aria-labelledby="weekTitle">
-          <div class="page-heading">
-            <div>
-              <p class="page-kicker">Weekly Log</p>
-              <h2 id="weekTitle">本周</h2>
-            </div>
-            <p id="weekRange" class="date-range"></p>
-          </div>
-          <div class="week-grid" id="weekGrid"></div>
-          <section class="legend">
-            <h3>符号</h3>
-            <div id="legendList" class="legend-list"></div>
-          </section>
+        <section class="legend" id="legendSection">
+          <h3>符号</h3>
+          <div id="legendList" class="legend-list"></div>
         </section>
 
-        <section class="today-page paper-page" aria-labelledby="todayTitle">
-          <div class="page-heading">
+        <!-- 今日浮窗遮罩 -->
+        <div class="sheet-backdrop" id="todayBackdrop" hidden></div>
+
+        <!-- 今日浮窗 -->
+        <section class="today-sheet" id="todaySheet" aria-label="今日日志" hidden>
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
             <div>
               <p class="page-kicker">Daily Log</p>
               <h2 id="todayTitle">今天</h2>
             </div>
             <p id="todayDate" class="date-range"></p>
+            <button class="icon-button sheet-close" id="todayCloseButton" type="button" aria-label="关闭">&times;</button>
           </div>
 
           <form class="quick-add" id="quickAddForm">
@@ -89,15 +60,65 @@
               <option value="–">– 备注</option>
               <option value="*">* 重要</option>
             </select>
-            <input id="quickText" type="text" placeholder="快速记录一条子弹..." autocomplete="off" />
+            <input id="quickText" type="text" placeholder="快速记录..." autocomplete="off" />
             <button class="primary-button" type="submit">加入</button>
           </form>
 
           <div class="daily-log" id="todayList"></div>
         </section>
       </section>
+
+      <!-- ====== 收件箱 Tab ====== -->
+      <section class="tab-panel" id="inboxPanel" aria-label="通知收件箱" hidden>
+        <div class="capture-strip">
+          <div class="capture-head">
+            <div>
+              <h2>通知收件箱</h2>
+              <p id="accessHint" class="access-hint"></p>
+            </div>
+            <div class="actions compact-actions">
+              <button class="primary-button" id="parseButton" type="button">解析</button>
+              <button class="ghost-button" id="pasteButton" type="button">粘贴</button>
+            </div>
+          </div>
+          <textarea
+            id="noticeInput"
+            placeholder="粘贴班群通知，解析后会拆成几条待确认的子弹任务。"
+            spellcheck="false"
+          ></textarea>
+        </div>
+
+        <section class="inbox-panel" id="reviewPanel" aria-live="polite" hidden>
+          <div class="section-heading">
+            <h2>待确认子弹</h2>
+            <span id="confidenceBadge" class="badge">待判断</span>
+          </div>
+          <div class="draft-list" id="draftList"></div>
+          <details class="source-details">
+            <summary>查看原通知</summary>
+            <p id="sourceText"></p>
+          </details>
+          <div class="actions">
+            <button class="primary-button" id="createButton" type="button">确认加入</button>
+            <button class="ghost-button" id="ignoreButton" type="button">忽略</button>
+          </div>
+        </section>
+      </section>
     </main>
 
+    <!-- ====== 底部 Tab Bar ====== -->
+    <nav class="tab-bar">
+      <button class="tab-button active" data-tab="week" aria-label="本周">
+        <span class="tab-icon">&#9702;</span>
+        <span class="tab-label">本周</span>
+      </button>
+      <button class="tab-button" data-tab="inbox" aria-label="收件箱">
+        <span class="tab-icon">&#9998;</span>
+        <span class="tab-label">收件箱</span>
+      </button>
+    </nav>
+
+    <!-- ====== 设置面板 ====== -->
     <div class="settings-overlay" id="settingsOverlay" hidden>
       <div class="settings-panel" role="dialog" aria-label="设置">
         <div class="settings-head">
@@ -120,6 +141,7 @@
       </div>
     </div>
 
+    <!-- ====== 模板 ====== -->
     <template id="bulletTemplate">
       <article class="bullet-row">
         <button class="bullet-symbol" type="button" title="切换状态"></button>
@@ -127,8 +149,8 @@
           <input class="bullet-text" type="text" />
           <p class="bullet-meta"></p>
         </div>
-        <button class="migrate-button" type="button" title="迁移">›</button>
-        <button class="delete-button" type="button" aria-label="删除任务" title="删除">×</button>
+        <button class="migrate-button" type="button" title="迁移到下一天">›</button>
+        <button class="delete-button" type="button" title="删除">×</button>
       </article>
     </template>
 
@@ -142,10 +164,11 @@
         </select>
         <input class="draft-text" type="text" />
         <input class="draft-date" type="date" />
+        <button class="draft-remove" type="button" title="移除此条">×</button>
       </article>
     </template>
 
     <script src="./parser.js?v=1"></script>
-    <script src="./app.js?v=9"></script>
+    <script src="./app.js?v=10"></script>
   </body>
 </html>

@@ -20,6 +20,7 @@ function initSyncDom() {
   domSync.syncCodeInput = document.querySelector("#syncCodeInput");
   domSync.syncConnectBtn = document.querySelector("#syncConnectBtn");
   domSync.syncDisconnectBtn = document.querySelector("#syncDisconnectBtn");
+  domSync.syncRefreshBtn = document.querySelector("#syncRefreshBtn");
   domSync.syncStatus = document.querySelector("#syncStatus");
 }
 
@@ -48,14 +49,16 @@ function renderSyncUI() {
   }
 }
 
-window.showSyncStatus = function (text, duration = 2000) {
+window.showSyncStatus = function (text, duration = 3000) {
   if (!domSync.syncStatus) return;
   domSync.syncStatus.textContent = text;
   domSync.syncStatus.style.opacity = "1";
   clearTimeout(domSync.syncStatus._timer);
-  domSync.syncStatus._timer = setTimeout(() => {
-    domSync.syncStatus.style.opacity = "0";
-  }, duration);
+  if (duration > 0) {
+    domSync.syncStatus._timer = setTimeout(() => {
+      domSync.syncStatus.style.opacity = "0";
+    }, duration);
+  }
 };
 
 /* ================================================================
@@ -66,15 +69,19 @@ async function pushToCloud(data) {
   if (!window.syncCode) return;
   const resp = await fetch(`${WORKER_URL}/${window.syncCode}`, {
     method: "PUT",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!resp.ok) throw new Error("Push failed: " + resp.status);
+  if (!resp.ok) throw new Error("Push " + resp.status);
 }
 
 async function pullFromCloud() {
   if (!window.syncCode) return null;
   const resp = await fetch(`${WORKER_URL}/${window.syncCode}`);
-  if (!resp.ok) throw new Error("Pull failed: " + resp.status);
+  if (!resp.ok) {
+    if (resp.status === 404) return {};
+    throw new Error("Pull " + resp.status);
+  }
   return resp.json();
 }
 
@@ -82,7 +89,7 @@ async function pullFromCloud() {
 async function onSyncConnect() {
   window.isSyncing = true;
   try {
-    window.showSyncStatus("同步中…");
+    window.showSyncStatus("同步中…", 0);
     const cloud = await pullFromCloud();
     if (cloud && Object.keys(cloud).length) {
       if (cloud.bullets && cloud.bullets.length) {
@@ -97,16 +104,16 @@ async function onSyncConnect() {
         state.yearlyEvents = cloud.yearlyEvents;
         saveJsonLocal(YEARLY_KEY, cloud.yearlyEvents);
       }
-      window.showSyncStatus("已同步云端数据");
+      window.showSyncStatus("已同步 " + (cloud.bullets ? cloud.bullets.length : 0) + " 条任务");
     } else {
-      // No cloud data, push local
       await pushLocalToCloud();
+      window.showSyncStatus("已上传本地 " + state.bullets.length + " 条任务");
     }
     renderAll();
     if (typeof renderAccessHint === "function") renderAccessHint();
   } catch (err) {
     console.warn("Sync failed", err);
-    window.showSyncStatus("同步失败，请检查网络");
+    window.showSyncStatus("同步失败: " + err.message, 0);
   } finally {
     window.isSyncing = false;
   }
@@ -119,9 +126,10 @@ async function pushLocalToCloud() {
       monthlyTodos: state.monthlyTodos,
       yearlyEvents: state.yearlyEvents,
     });
-    window.showSyncStatus("已上传本地数据");
   } catch (err) {
     console.warn("Push failed", err);
+    window.showSyncStatus("上传失败: " + err.message, 0);
+    throw err;
   }
 }
 
@@ -217,6 +225,7 @@ function setupSync() {
   if (domSync.syncGenBtn) domSync.syncGenBtn.addEventListener("click", doGenerateCode);
   if (domSync.syncConnectBtn) domSync.syncConnectBtn.addEventListener("click", doConnectCode);
   if (domSync.syncDisconnectBtn) domSync.syncDisconnectBtn.addEventListener("click", doDisconnect);
+  if (domSync.syncRefreshBtn) domSync.syncRefreshBtn.addEventListener("click", () => onSyncConnect());
   if (domSync.syncOverlay) {
     domSync.syncOverlay.addEventListener("click", (e) => {
       if (e.target === domSync.syncOverlay) closeSyncPanel();

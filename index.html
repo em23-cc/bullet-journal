@@ -6,13 +6,13 @@
     <meta name="theme-color" content="#f8f7f4" />
     <title>子弹计划</title>
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=16" />
+    <link rel="stylesheet" href="./styles.css?v=17" />
   </head>
   <body>
     <main class="journal-shell">
       <header class="journal-header">
         <div>
-          <p class="eyebrow">个人子弹计划 <span class="version-badge">v23</span></p>
+          <p class="eyebrow">个人子弹计划 <span class="version-badge">v24</span></p>
           <h1 id="pageTitle">本周</h1>
         </div>
         <div class="header-actions">
@@ -20,6 +20,7 @@
           <span class="user-badge" id="syncBadge" hidden>
             <span class="user-icon">&#9733;</span>
             <span id="syncCodeDisplay"></span>
+            <button class="sync-refresh" id="syncRefreshBtn" type="button" title="立即同步">&#8635;</button>
           </span>
           <span class="sync-status" id="syncStatus"></span>
           <button class="icon-button" id="settingsButton" type="button" aria-label="设置" title="设置">&#9881;</button>
@@ -280,8 +281,8 @@
     </template>
 
     <script src="./parser.js?v=2"></script>
-    <script src="./sync.js?v=1"></script>
-    <script src="./app.js?v=16"></script>
+    <script src="./sync.js?v=2"></script>
+    <script src="./app.js?v=17"></script>
 
     <!-- 同步面板 -->
     <div class="login-overlay" id="syncOverlay" hidden>

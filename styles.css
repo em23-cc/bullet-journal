@@ -842,6 +842,14 @@ h3 { font-size: 13px; font-weight: 500; letter-spacing: 0.05em; text-transform: 
 }
 .user-logout:hover { background: var(--paper); color: var(--warm); }
 
+.sync-refresh {
+  width: 22px; height: 22px; border: 0; border-radius: 50%;
+  background: transparent; color: var(--muted); font-size: 14px;
+  cursor: pointer; display: inline-grid; place-items: center;
+  transition: background 0.15s, color 0.15s;
+}
+.sync-refresh:hover { background: var(--paper); color: var(--accent-strong); }
+
 .sync-status {
   font-size: 11px; color: var(--muted);
   opacity: 0; transition: opacity 0.3s;

@@ -1070,9 +1070,9 @@ function renderAccessHint() {
   dom.accessHint.textContent =
     location.hostname === "127.0.0.1" || location.hostname === "localhost"
       ? "手机访问请使用电脑的局域网 IP 地址。"
-      : window.syncCode
-        ? "同步已开启，多设备输入同一同步码即可共享数据。"
-        : "点击同步按钮，输入同步码即可多设备共享。";
+      : window.currentUser
+        ? "已登录，多设备用同一账号即可同步数据。"
+        : "登录账号即可多设备同步数据。";
 }
 
 /* ================================================================

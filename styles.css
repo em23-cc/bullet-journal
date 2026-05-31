@@ -317,7 +317,13 @@ h3 { font-size: 15px; }
 .month-task-row .bullet-symbol { width: 28px; height: 28px; font-size: 14px; line-height: 28px; }
 .month-task-row .bullet-text { font-size: 13px; min-height: 22px; }
 .month-task-row .bullet-meta { display: none; }
-.month-task-row .delete-button, .month-task-row .migrate-button { display: none; }
+.month-task-row .migrate-button { display: none; }
+.month-task-row .delete-button {
+  display: inline-grid;
+  width: 24px; height: 24px; font-size: 14px;
+  opacity: 0.35; flex-shrink: 0;
+}
+.month-task-row .delete-button:hover { opacity: 1; color: var(--warm); border-color: var(--line); background: var(--paper-soft); }
 
 /* Month split layout */
 .month-split {

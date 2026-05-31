@@ -1,0 +1,7 @@
+name = "bullet-sync"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "BULLET_SYNC"
+id = "1bf521fb6c9c4a37b6b28710476afa50"

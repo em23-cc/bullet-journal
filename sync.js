@@ -1,6 +1,6 @@
 /* sync.js — 同步密钥：多设备数据同步 */
 // 替换为你的 Cloudflare Worker URL
-const WORKER_URL = "https://YOUR_WORKER.workers.dev";
+const WORKER_URL = "https://bullet-sync.3515182388.workers.dev";
 
 window.syncCode = null;
 window.isSyncing = false;

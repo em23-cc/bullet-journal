@@ -1036,14 +1036,8 @@ if ("serviceWorker" in navigator) {
 }
 
 /* ================================================================
-   Storage helpers (localStorage + LeanCloud sync)
+   Storage helpers (localStorage + sync.js cloud)
    ================================================================ */
-
-const CLASS_MAP = {
-  "bullet-journal-planner:v2": "Bullet",
-  "bullet-journal-planner:monthly-todos": "MonthlyTodo",
-  "bullet-journal-planner:yearly-events": "YearlyEvent",
-};
 
 function loadJson(key) {
   try { const v = JSON.parse(localStorage.getItem(key)); return Array.isArray(v) ? v : null; }
@@ -1052,114 +1046,12 @@ function loadJson(key) {
 
 function saveJson(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
-  queueCloudSave(key, data);
+  if (typeof queueCloudPush === "function") queueCloudPush();
 }
 
-/* Cloud sync — debounced, fire-and-forget */
-
-let cloudSaveQueue = {};
-let cloudSaveTimer = null;
-
-function queueCloudSave(key, data) {
-  if (!window.currentUser) return;
-  cloudSaveQueue[key] = data;
-  if (!cloudSaveTimer) {
-    cloudSaveTimer = setTimeout(() => {
-      const pending = cloudSaveQueue;
-      cloudSaveQueue = {};
-      cloudSaveTimer = null;
-      flushCloudSave(pending);
-    }, 800);
-  }
-}
-
-async function flushCloudSave(queue) {
-  for (const [key, data] of Object.entries(queue)) {
-    try { await saveToCloud(key, data); }
-    catch (err) { console.warn("Cloud save failed for " + key, err); }
-  }
-}
-
-async function saveToCloud(key, data) {
-  const user = AV.User.current();
-  if (!user) return;
-  const className = CLASS_MAP[key];
-  if (!className) return;
-
-  // Remove all existing objects for this user + class
-  const query = new AV.Query(className);
-  query.equalTo("user", user);
-  query.limit(1000);
-  const existing = await query.find();
-  if (existing.length) await AV.Object.destroyAll(existing);
-
-  // Save all current objects
-  if (!data.length) return;
-  const objects = data.map((item) => {
-    const Cls = AV.Object.extend(className);
-    const obj = new Cls();
-    Object.entries(item).forEach(([k, v]) => {
-      if (k !== "user") obj.set(k, v);
-    });
-    obj.set("user", user);
-    return obj;
-  });
-  await AV.Object.saveAll(objects);
-}
-
-async function loadFromCloud(key) {
-  const user = AV.User.current();
-  if (!user) return null;
-  const className = CLASS_MAP[key];
-  if (!className) return null;
-
-  const query = new AV.Query(className);
-  query.equalTo("user", user);
-  query.limit(1000);
-  const results = await query.find();
-  return results.map((r) => {
-    const attrs = r.toJSON();
-    delete attrs.user;
-    delete attrs.objectId;
-    delete attrs.updatedAt;
-    return attrs;
-  });
-}
-
-/* Called by auth.js after login — pull cloud data, merge into state */
-async function onLoginSync() {
-  try {
-    showSyncStatus("同步中…");
-    const [bullets, todos, events] = await Promise.all([
-      loadFromCloud(STORAGE_KEY),
-      loadFromCloud(MONTHLY_KEY),
-      loadFromCloud(YEARLY_KEY),
-    ]);
-    if (bullets && bullets.length) {
-      state.bullets = bullets;
-      saveJson(STORAGE_KEY, bullets);
-    } else {
-      // No cloud data — push local data to cloud
-      queueCloudSave(STORAGE_KEY, state.bullets);
-    }
-    if (todos && todos.length) {
-      state.monthlyTodos = todos;
-      saveJson(MONTHLY_KEY, todos);
-    } else {
-      queueCloudSave(MONTHLY_KEY, state.monthlyTodos);
-    }
-    if (events && events.length) {
-      state.yearlyEvents = events;
-      saveJson(YEARLY_KEY, events);
-    } else {
-      queueCloudSave(YEARLY_KEY, state.yearlyEvents);
-    }
-    renderAll();
-    showSyncStatus("已同步");
-  } catch (err) {
-    console.warn("Sync failed", err);
-    showSyncStatus("同步失败，使用本地数据");
-  }
+/* localStorage-only (no cloud queue) — used during sync to avoid loop */
+function saveJsonLocal(key, data) {
+  localStorage.setItem(key, JSON.stringify(data));
 }
 
 function migrateLegacy() {
@@ -1178,9 +1070,9 @@ function renderAccessHint() {
   dom.accessHint.textContent =
     location.hostname === "127.0.0.1" || location.hostname === "localhost"
       ? "手机访问请使用电脑的局域网 IP 地址。"
-      : window.currentUser
-        ? "数据已同步到云端，多设备登录后自动同步。"
-        : "登录后数据自动同步到云端，多设备共享。";
+      : window.syncCode
+        ? "同步已开启，多设备输入同一同步码即可共享数据。"
+        : "点击同步按钮，输入同步码即可多设备共享。";
 }
 
 /* ================================================================
@@ -1192,7 +1084,4 @@ renderLegend();
 renderWeek();
 renderInboxHistory();
 
-// If already logged in (session persisted from previous visit), sync on load
-if (window.currentUser && typeof onLoginSync === "function") {
-  onLoginSync();
-}
+// Sync handled by sync.js setupSync() — it calls onSyncConnect on load if syncCode saved

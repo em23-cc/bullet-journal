@@ -6,21 +6,20 @@
     <meta name="theme-color" content="#f8f7f4" />
     <title>子弹计划</title>
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=15" />
+    <link rel="stylesheet" href="./styles.css?v=16" />
   </head>
   <body>
     <main class="journal-shell">
       <header class="journal-header">
         <div>
-          <p class="eyebrow">个人子弹计划 <span class="version-badge">v22</span></p>
+          <p class="eyebrow">个人子弹计划 <span class="version-badge">v23</span></p>
           <h1 id="pageTitle">本周</h1>
         </div>
         <div class="header-actions">
-          <button class="auth-button" id="loginBtn" type="button">登录</button>
-          <span class="user-badge" id="userBadge" hidden>
-            <span class="user-icon">&#9786;</span>
-            <span id="userPhone"></span>
-            <button class="user-logout" id="logoutBtn" type="button" title="退出登录">&#10005;</button>
+          <button class="auth-button" id="syncBtn" type="button">同步</button>
+          <span class="user-badge" id="syncBadge" hidden>
+            <span class="user-icon">&#9733;</span>
+            <span id="syncCodeDisplay"></span>
           </span>
           <span class="sync-status" id="syncStatus"></span>
           <button class="icon-button" id="settingsButton" type="button" aria-label="设置" title="设置">&#9881;</button>
@@ -281,28 +280,26 @@
     </template>
 
     <script src="./parser.js?v=2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4/dist/av-min.js"></script>
-    <script src="./auth.js?v=1"></script>
-    <script src="./app.js?v=15"></script>
+    <script src="./sync.js?v=1"></script>
+    <script src="./app.js?v=16"></script>
 
-    <!-- 登录弹窗 -->
-    <div class="login-overlay" id="loginOverlay" hidden>
+    <!-- 同步面板 -->
+    <div class="login-overlay" id="syncOverlay" hidden>
       <div class="login-panel">
-        <h2>手机号登录</h2>
-        <p class="login-hint">登录后数据自动同步到云端，多设备共享</p>
+        <h2>多设备同步</h2>
+        <p class="login-hint">生成一个同步码，在其他设备输入同样的同步码即可共享数据</p>
         <label class="login-field">
-          <span>手机号</span>
-          <input id="phoneInput" type="tel" placeholder="输入手机号" maxlength="11" autocomplete="tel" />
-        </label>
-        <label class="login-field">
-          <span>验证码</span>
+          <span>同步码</span>
           <div class="code-row">
-            <input id="codeInput" type="text" placeholder="输入验证码" maxlength="6" autocomplete="off" />
-            <button class="code-btn" id="sendCodeBtn" type="button">发送验证码</button>
+            <input id="syncCodeInput" type="text" placeholder="输入或生成同步码" maxlength="6" autocomplete="off" style="text-transform:uppercase" />
+            <button class="code-btn" id="syncGenBtn" type="button">随机生成</button>
           </div>
         </label>
-        <button class="primary-button login-confirm" id="confirmLoginBtn" type="button">确认登录</button>
-        <p class="login-note">未注册手机号将自动注册</p>
+        <div class="sync-actions">
+          <button class="primary-button" id="syncConnectBtn" type="button" style="flex:1">连接同步</button>
+        </div>
+        <button class="ghost-button" id="syncDisconnectBtn" type="button" style="width:100%;margin-top:8px;color:var(--warm)">断开同步</button>
+        <p class="login-note">同步码相同的设备共享同一份数据</p>
       </div>
     </div>
   </body>

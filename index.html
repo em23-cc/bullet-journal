@@ -6,13 +6,13 @@
     <meta name="theme-color" content="#f8f7f4" />
     <title>子弹计划</title>
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=17" />
+    <link rel="stylesheet" href="./styles.css?v=18" />
   </head>
   <body>
     <main class="journal-shell">
       <header class="journal-header">
         <div>
-          <p class="eyebrow">个人子弹计划 <span class="version-badge">v27</span></p>
+          <p class="eyebrow">个人子弹计划 <span class="version-badge">v28</span></p>
           <h1 id="pageTitle">本周</h1>
         </div>
         <div class="header-actions">
@@ -283,7 +283,7 @@
 
     <script src="./parser.js?v=2"></script>
     <script src="./sync.js?v=5"></script>
-    <script src="./app.js?v=18"></script>
+    <script src="./app.js?v=19"></script>
 
     <!-- 登录面板 -->
     <div class="login-overlay" id="loginOverlay" hidden>
@@ -308,6 +308,11 @@
         </div>
         <p class="login-note">每人一个账号，数据完全隔离。Token 只存在本机。</p>
       </div>
+    </div>
+    <!-- 撤销 Toast -->
+    <div class="undo-toast" id="undoToast" hidden>
+      <span>已迁移到下一天</span>
+      <button id="undoBtn" type="button">撤销</button>
     </div>
   </body>
 </html>

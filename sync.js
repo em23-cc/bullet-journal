@@ -3,7 +3,12 @@ window.currentUser = null;
 window.isSyncing = false;
 
 // GitHub Personal Access Token — 只需 gist 权限
-const GITHUB_TOKEN = "github_pat_REPLACE_ME";
+function getGithubToken() {
+  return localStorage.getItem("bullet-github-token") || "";
+}
+function setGithubToken(t) {
+  if (t) localStorage.setItem("bullet-github-token", t.trim());
+}
 
 /* ================================================================
    DOM refs
@@ -19,6 +24,7 @@ function initSyncDom() {
   domSync.syncRefreshBtn = document.querySelector("#syncRefreshBtn");
   domSync.syncStatus = document.querySelector("#syncStatus");
   domSync.loginOverlay = document.querySelector("#loginOverlay");
+  domSync.tokenInput = document.querySelector("#tokenInput");
   domSync.usernameInput = document.querySelector("#usernameInput");
   domSync.passwordInput = document.querySelector("#passwordInput");
   domSync.doLoginBtn = document.querySelector("#doLoginBtn");
@@ -40,7 +46,9 @@ async function hashPassword(username, password) {
    ================================================================ */
 
 async function gh(url, opts = {}) {
-  const headers = { Authorization: "Bearer " + GITHUB_TOKEN, Accept: "application/vnd.github+json" };
+  const token = getGithubToken();
+  if (!token) throw new Error("请先设置 GitHub Token");
+  const headers = { Authorization: "Bearer " + token, Accept: "application/vnd.github+json" };
   if (opts.body) headers["Content-Type"] = "application/json";
   const resp = await fetch("https://api.github.com" + url, { ...opts, headers });
   if (!resp.ok) {
@@ -175,6 +183,7 @@ async function pushLocalToCloud() {
    ================================================================ */
 
 async function doLogin() {
+  if (domSync.tokenInput) setGithubToken(domSync.tokenInput.value);
   const username = domSync.usernameInput.value.trim();
   const password = domSync.passwordInput.value;
   if (!username || !password) { alert("请输入用户名和密码"); return; }
@@ -208,6 +217,7 @@ async function doLogin() {
 }
 
 async function doRegister() {
+  if (domSync.tokenInput) setGithubToken(domSync.tokenInput.value);
   const username = domSync.usernameInput.value.trim();
   const password = domSync.passwordInput.value;
   if (!username || !password) { alert("请输入用户名和密码"); return; }
@@ -337,6 +347,7 @@ window.showSyncStatus = function (text, duration = 3000) {
 function openLoginPanel() {
   if (!domSync.loginOverlay) return;
   domSync.loginOverlay.hidden = false;
+  if (domSync.tokenInput) domSync.tokenInput.value = getGithubToken();
   domSync.usernameInput.value = "";
   domSync.passwordInput.value = "";
   domSync.usernameInput.focus();

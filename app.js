@@ -1030,18 +1030,65 @@ function updateApiKeyHint() {
    PWA
    ================================================================ */
 
+// 已安装（standalone 模式）则隐藏安装按钮
+if (window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator.standalone !== undefined && navigator.standalone)) {
+  dom.installButton.hidden = true;
+}
+
+// Android Chrome 原生安装提示
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
   state.deferredInstallPrompt = event;
-  dom.installButton.hidden = false;
 });
 
 dom.installButton.addEventListener("click", async () => {
-  if (!state.deferredInstallPrompt) return;
-  state.deferredInstallPrompt.prompt();
-  await state.deferredInstallPrompt.userChoice;
-  state.deferredInstallPrompt = null;
+  // 优先尝试原生安装提示
+  if (state.deferredInstallPrompt) {
+    try {
+      state.deferredInstallPrompt.prompt();
+      const result = await state.deferredInstallPrompt.userChoice;
+      if (result.outcome === "accepted") { dom.installButton.hidden = true; return; }
+    } catch (e) { /* prompt 失败，走指引 */ }
+    state.deferredInstallPrompt = null;
+  }
+  // 显示安装指引面板
+  showInstallGuide();
 });
+
+function showInstallGuide() {
+  // 移除旧面板
+  const old = document.querySelector(".install-guide-overlay");
+  if (old) old.remove();
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/.test(navigator.userAgent);
+
+  const overlay = document.createElement("div");
+  overlay.className = "install-guide-overlay";
+
+  let steps;
+  if (isIOS) {
+    steps = "1. 点击底部 <b>分享</b> 按钮<br>2. 滑动找到「<b>添加到主屏幕</b>」<br>3. 点右上角「<b>添加</b>」";
+  } else if (isAndroid) {
+    steps = "1. 点击右上角菜单 <b>⋮</b><br>2. 选择「<b>添加到主屏幕</b>」<br>3. 在弹出的对话框中确认";
+  } else {
+    steps = "点击浏览器地址栏右侧的 <b>安装图标</b> 即可";
+  }
+
+  overlay.innerHTML = `<div class="install-guide-card">
+    <p class="install-guide-title">安装到桌面</p>
+    <p class="install-guide-steps">${steps}</p>
+    <button class="primary-button install-guide-close">知道了</button>
+  </div>`;
+
+  const close = () => overlay.remove();
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  overlay.querySelector(".install-guide-close").addEventListener("click", close);
+
+  document.body.appendChild(overlay);
+}
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").then((reg) => {

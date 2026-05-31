@@ -1005,3 +1005,39 @@ h3 { font-size: 13px; font-weight: 500; letter-spacing: 0.05em; text-transform: 
   .month-date-row .date-dow { width: 20px; font-size: 10px; }
   .month-task-row { padding: 3px 6px; }
 }
+
+/* ---------- Install guide overlay ---------- */
+
+.install-guide-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  animation: guideFadeIn 0.2s ease;
+}
+
+@keyframes guideFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.install-guide-card {
+  background: var(--paper); border-radius: 8px;
+  padding: 28px 24px 20px; margin: 24px;
+  max-width: 320px; width: 100%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  text-align: center;
+}
+
+.install-guide-title {
+  font-size: 17px; font-weight: 600; margin: 0 0 16px;
+  letter-spacing: 0.03em;
+}
+
+.install-guide-steps {
+  font-size: 14px; line-height: 1.8; color: var(--muted);
+  margin: 0 0 20px; text-align: left;
+}
+
+.install-guide-close {
+  min-width: 120px;
+}

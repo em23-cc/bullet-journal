@@ -37,9 +37,6 @@ function formatShort(dateKey) {
 const state = {
   bullets: loadJson(STORAGE_KEY) || migrateLegacy(),
   monthlyTodos: loadJson(MONTHLY_KEY) || [],
-  /* undo state for migrate action */
-  undoAction: null,
-  undoTimer: null,
   yearlyEvents: loadJson(YEARLY_KEY) || [],
   draft: null,
   weekOffset: 0,
@@ -807,52 +804,10 @@ $$(".color-dot").forEach((dot) => {
    ================================================================ */
 
 function doMigrate(bullet) {
-  const prev = { symbol: bullet.symbol, dateKey: bullet.dateKey };
   bullet.symbol = ">";
   bullet.dateKey = dateKeyFromDate(addDays(new Date(bullet.dateKey + "T00:00:00"), 1));
   saveJson(STORAGE_KEY, state.bullets);
-
-  state.undoAction = { type: "migrate", bullet, prev };
-  clearTimeout(state.undoTimer);
-  showUndoToast();
-
-  state.undoTimer = setTimeout(() => {
-    state.undoAction = null;
-    hideUndoToast();
-  }, 5000);
 }
-
-function undoLastAction() {
-  if (!state.undoAction) return;
-  const { type, bullet, prev } = state.undoAction;
-  if (type === "migrate") {
-    bullet.symbol = prev.symbol;
-    bullet.dateKey = prev.dateKey;
-    saveJson(STORAGE_KEY, state.bullets);
-  }
-  state.undoAction = null;
-  hideUndoToast();
-  renderAll();
-}
-
-function showUndoToast() {
-  const toast = document.querySelector("#undoToast");
-  if (!toast) return;
-  const span = toast.querySelector("span");
-  if (span && state.undoAction) {
-    span.textContent = "已迁移到下一天";
-  }
-  toast.hidden = false;
-  toast.style.opacity = "1";
-}
-
-function hideUndoToast() {
-  const toast = document.querySelector("#undoToast");
-  if (!toast) return;
-  toast.style.opacity = "0";
-  setTimeout(() => { toast.hidden = true; }, 200);
-}
-
 /* ================================================================
    Bullet node + Symbol popover
    ================================================================ */
@@ -1151,9 +1106,5 @@ renderAccessHint();
 renderLegend();
 renderWeek();
 renderInboxHistory();
-
-// Undo button
-const undoBtn = document.querySelector("#undoBtn");
-if (undoBtn) undoBtn.addEventListener("click", undoLastAction);
 
 // Sync handled by sync.js setupSync() — it calls onSyncConnect on load if syncCode saved

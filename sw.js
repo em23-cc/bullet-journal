@@ -1,5 +1,5 @@
-const cacheName = "personal-task-inbox:v29";
-const assets = ["./", "./index.html", "./styles.css?v=19", "./parser.js?v=2", "./sync.js?v=5", "./app.js?v=20", "./manifest.webmanifest", "./icon.svg"];
+const cacheName = "personal-task-inbox:v30";
+const assets = ["./", "./index.html", "./styles.css?v=20", "./parser.js?v=2", "./sync.js?v=5", "./app.js?v=21", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();

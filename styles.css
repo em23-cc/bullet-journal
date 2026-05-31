@@ -717,6 +717,10 @@ h3 { font-size: 13px; font-weight: 500; letter-spacing: 0.05em; text-transform: 
 }
 
 .symbol-option:hover { background: var(--paper-soft); }
+.symbol-option.revert {
+  color: var(--warm); font-weight: 700;
+  border-bottom: 1px solid var(--line-soft); margin-bottom: 2px; padding-bottom: 8px;
+}
 .symbol-option:first-child { color: var(--done); }
 .symbol-option:nth-child(2) { color: var(--accent); }
 .symbol-option:nth-child(3) { color: var(--shelved); }

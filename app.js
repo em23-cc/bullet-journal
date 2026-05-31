@@ -954,6 +954,23 @@ function showSymbolPopover(anchor) {
 
 function rebuildSymbolMenu() {
   dom.symbolPopover.replaceChildren();
+
+  // If current bullet is migrated, add undo option
+  const b = state.activePopoverBullet;
+  if (b && b.symbol === ">") {
+    const revertBtn = mkEl("button", { className: "symbol-option revert" });
+    revertBtn.textContent = "↩ 撤销迁移";
+    revertBtn.addEventListener("click", () => {
+      b.symbol = "•";
+      // Move back to previous day
+      b.dateKey = dateKeyFromDate(addDays(new Date(b.dateKey + "T00:00:00"), -1));
+      saveJson(STORAGE_KEY, state.bullets);
+      hideSymbolPopover();
+      renderAll();
+    });
+    dom.symbolPopover.append(revertBtn);
+  }
+
   [
     { sym: "×", label: "× 完成" },
     { sym: ">", label: "> 迁移" },

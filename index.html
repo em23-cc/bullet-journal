@@ -12,7 +12,7 @@
     <main class="journal-shell">
       <header class="journal-header">
         <div>
-          <p class="eyebrow">个人子弹计划 <span class="version-badge">v24</span></p>
+          <p class="eyebrow">个人子弹计划 <span class="version-badge">v25</span></p>
           <h1 id="pageTitle">本周</h1>
         </div>
         <div class="header-actions">
@@ -281,7 +281,7 @@
     </template>
 
     <script src="./parser.js?v=2"></script>
-    <script src="./sync.js?v=2"></script>
+    <script src="./sync.js?v=3"></script>
     <script src="./app.js?v=17"></script>
 
     <!-- 同步面板 -->
@@ -289,6 +289,11 @@
       <div class="login-panel">
         <h2>多设备同步</h2>
         <p class="login-hint">生成一个同步码，在其他设备输入同样的同步码即可共享数据</p>
+        <label class="login-field">
+          <span>GitHub Token</span>
+          <input id="tokenInput" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
+          <span class="field-hint"><a href="https://github.com/settings/tokens" target="_blank">获取 Token</a>（只需勾选 gist 权限）</span>
+        </label>
         <label class="login-field">
           <span>同步码</span>
           <div class="code-row">

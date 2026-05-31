@@ -1,7 +1,4 @@
-/* sync.js — 同步密钥：多设备数据同步 */
-// 替换为你的 Cloudflare Worker URL
-const WORKER_URL = "https://bullet-sync.3515182388.workers.dev";
-
+/* sync.js — GitHub Gist 多设备数据同步 */
 window.syncCode = null;
 window.isSyncing = false;
 
@@ -22,6 +19,19 @@ function initSyncDom() {
   domSync.syncDisconnectBtn = document.querySelector("#syncDisconnectBtn");
   domSync.syncRefreshBtn = document.querySelector("#syncRefreshBtn");
   domSync.syncStatus = document.querySelector("#syncStatus");
+  domSync.tokenInput = document.querySelector("#tokenInput");
+}
+
+/* ================================================================
+   GitHub Token
+   ================================================================ */
+
+function getToken() {
+  return localStorage.getItem("bullet-github-token") || "";
+}
+
+function setToken(t) {
+  localStorage.setItem("bullet-github-token", t.trim());
 }
 
 /* ================================================================
@@ -62,31 +72,121 @@ window.showSyncStatus = function (text, duration = 3000) {
 };
 
 /* ================================================================
-   Cloud data push / pull
+   GitHub Gist API
    ================================================================ */
 
-async function pushToCloud(data) {
-  if (!window.syncCode) return;
-  const resp = await fetch(`${WORKER_URL}/${window.syncCode}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!resp.ok) throw new Error("Push " + resp.status);
-}
-
-async function pullFromCloud() {
-  if (!window.syncCode) return null;
-  const resp = await fetch(`${WORKER_URL}/${window.syncCode}`);
+async function gh(url, opts = {}) {
+  const token = getToken();
+  if (!token) throw new Error("请先设置 GitHub Token");
+  const headers = { Authorization: "Bearer " + token, Accept: "application/vnd.github+json" };
+  if (opts.body) headers["Content-Type"] = "application/json";
+  const resp = await fetch("https://api.github.com" + url, { ...opts, headers });
   if (!resp.ok) {
-    if (resp.status === 404) return {};
-    throw new Error("Pull " + resp.status);
+    if (resp.status === 401) throw new Error("Token 无效");
+    if (resp.status === 403 && resp.headers.get("X-RateLimit-Remaining") === "0") throw new Error("API 限流");
+    throw new Error("GitHub " + resp.status);
   }
   return resp.json();
 }
 
-/* Called by app.js after connecting — fetch cloud data, merge into state */
+async function findGist() {
+  // List user's gists, find one with description "bullet-sync:CODE"
+  let page = 1;
+  while (true) {
+    const gists = await gh("/gists?per_page=100&page=" + page);
+    if (!gists.length) break;
+    for (const g of gists) {
+      if (g.description === "bullet-sync:" + window.syncCode) return g;
+    }
+    if (gists.length < 100) break;
+    page++;
+  }
+  return null;
+}
+
+async function createGist(data) {
+  const body = {
+    description: "bullet-sync:" + window.syncCode,
+    public: false,
+    files: { "sync.json": { content: JSON.stringify(data) } },
+  };
+  const gist = await gh("/gists", { method: "POST", body: JSON.stringify(body) });
+  localStorage.setItem("bullet-gist-id:" + window.syncCode, gist.id);
+  return gist;
+}
+
+async function updateGist(gistId, data) {
+  return gh("/gists/" + gistId, {
+    method: "PATCH",
+    body: JSON.stringify({ files: { "sync.json": { content: JSON.stringify(data) } } }),
+  });
+}
+
+async function readGist(gistId) {
+  const gist = await gh("/gists/" + gistId);
+  const file = gist.files["sync.json"];
+  if (!file || !file.content) return {};
+  try { return JSON.parse(file.content); } catch { return {}; }
+}
+
+/* ================================================================
+   Push / Pull
+   ================================================================ */
+
+async function pushToCloud(data) {
+  if (!window.syncCode) return;
+  const cachedId = localStorage.getItem("bullet-gist-id:" + window.syncCode);
+  if (cachedId) {
+    try { await updateGist(cachedId, data); return; }
+    catch (e) { /* gist may have been deleted */ }
+  }
+  const gist = await findGist();
+  if (gist) {
+    await updateGist(gist.id, data);
+    localStorage.setItem("bullet-gist-id:" + window.syncCode, gist.id);
+  } else {
+    await createGist(data);
+  }
+}
+
+async function pullFromCloud() {
+  if (!window.syncCode) return null;
+  const cachedId = localStorage.getItem("bullet-gist-id:" + window.syncCode);
+  if (cachedId) {
+    try { return await readGist(cachedId); }
+    catch (e) { /* gist may have been deleted */ }
+  }
+  const gist = await findGist();
+  if (gist) {
+    localStorage.setItem("bullet-gist-id:" + window.syncCode, gist.id);
+    return await readGist(gist.id);
+  }
+  return {};
+}
+
+async function pushLocalToCloud() {
+  try {
+    await pushToCloud({
+      bullets: state.bullets,
+      monthlyTodos: state.monthlyTodos,
+      yearlyEvents: state.yearlyEvents,
+    });
+  } catch (err) {
+    console.warn("Push failed", err);
+    window.showSyncStatus("上传失败: " + err.message, 0);
+    throw err;
+  }
+}
+
+/* ================================================================
+   Connect / Disconnect
+   ================================================================ */
+
 async function onSyncConnect() {
+  if (!getToken()) {
+    window.showSyncStatus("请先设置 GitHub Token", 0);
+    return;
+  }
   window.isSyncing = true;
   try {
     window.showSyncStatus("同步中…", 0);
@@ -119,20 +219,6 @@ async function onSyncConnect() {
   }
 }
 
-async function pushLocalToCloud() {
-  try {
-    await pushToCloud({
-      bullets: state.bullets,
-      monthlyTodos: state.monthlyTodos,
-      yearlyEvents: state.yearlyEvents,
-    });
-  } catch (err) {
-    console.warn("Push failed", err);
-    window.showSyncStatus("上传失败: " + err.message, 0);
-    throw err;
-  }
-}
-
 /* ================================================================
    UI actions
    ================================================================ */
@@ -140,9 +226,8 @@ async function pushLocalToCloud() {
 function openSyncPanel() {
   if (!domSync.syncOverlay) return;
   domSync.syncOverlay.hidden = false;
-  if (window.syncCode) {
-    domSync.syncCodeDisplay.textContent = window.syncCode;
-  }
+  if (domSync.tokenInput) domSync.tokenInput.value = getToken();
+  if (window.syncCode) domSync.syncCodeDisplay.textContent = window.syncCode;
 }
 
 function closeSyncPanel() {
@@ -156,8 +241,8 @@ async function doGenerateCode() {
   window.syncCode = code;
   localStorage.setItem("bullet-sync-code", code);
   renderSyncUI();
-  showSyncStatus("已生成同步码: " + code, 4000);
-  // Push local data to cloud
+  window.showSyncStatus("已生成同步码: " + code, 4000);
+  if (domSync.tokenInput) setToken(domSync.tokenInput.value.trim());
   await onSyncConnect();
 }
 
@@ -169,6 +254,7 @@ async function doConnectCode() {
   }
   domSync.syncConnectBtn.disabled = true;
   try {
+    if (domSync.tokenInput) setToken(domSync.tokenInput.value.trim());
     window.syncCode = code;
     localStorage.setItem("bullet-sync-code", code);
     renderSyncUI();
@@ -186,12 +272,12 @@ function doDisconnect() {
   window.syncCode = null;
   localStorage.removeItem("bullet-sync-code");
   renderSyncUI();
-  showSyncStatus("已断开同步，数据仅存于本机");
+  window.showSyncStatus("已断开同步，数据仅存于本机");
   if (typeof renderAccessHint === "function") renderAccessHint();
 }
 
 /* ================================================================
-   Debounced cloud push (called by app.js after every local save)
+   Debounced cloud push
    ================================================================ */
 
 let pushTimer = null;
@@ -202,7 +288,7 @@ function queueCloudPush() {
   pushTimer = setTimeout(() => {
     pushLocalToCloud();
     pushTimer = null;
-  }, 1000);
+  }, 1500);
 }
 
 /* ================================================================
@@ -212,14 +298,12 @@ function queueCloudPush() {
 function setupSync() {
   initSyncDom();
 
-  // Restore sync code from localStorage
   const savedCode = localStorage.getItem("bullet-sync-code");
   if (savedCode) {
     window.syncCode = savedCode;
   }
   renderSyncUI();
 
-  // Event bindings
   if (domSync.syncBtn) domSync.syncBtn.addEventListener("click", openSyncPanel);
   if (domSync.syncBadge) domSync.syncBadge.addEventListener("click", openSyncPanel);
   if (domSync.syncGenBtn) domSync.syncGenBtn.addEventListener("click", doGenerateCode);
@@ -232,8 +316,7 @@ function setupSync() {
     });
   }
 
-  // If already synced, load from cloud
-  if (window.syncCode) {
+  if (window.syncCode && getToken()) {
     onSyncConnect();
   }
 }

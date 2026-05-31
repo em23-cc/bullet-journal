@@ -422,12 +422,26 @@ function renderMonth() {
     }
 
     dayEvents.forEach((evt) => {
+      const sd = evt.startDate || evt.date;
+      const ed = evt.endDate;
+      let displayText = evt.text;
+      if (ed && ed !== sd) {
+        const sdDay = parseInt(sd.split("-")[2]);
+        const edDay = parseInt(ed.split("-")[2]);
+        const sdMonth = parseInt(sd.split("-")[1]);
+        const edMonth = parseInt(ed.split("-")[1]);
+        if (sdMonth !== edMonth) {
+          displayText = `${evt.text} (${sdMonth}月${sdDay}日-${edMonth}月${edDay}日)`;
+        } else {
+          displayText = `${evt.text} (${sdDay}日-${edDay}日)`;
+        }
+      }
       const evtEl = mkEl("div", { className: "month-year-event" });
       const dot = mkEl("div", { className: "ye-dot" });
       dot.style.backgroundColor = evt.color;
-      const txt = mkEl("span", { className: "ye-text", textContent: evt.text });
+      const txt = mkEl("span", { className: "ye-text", textContent: displayText });
       evtEl.append(dot, txt);
-      evtEl.addEventListener("click", () => openYearEventPicker((evt.date || evt.startDate), evt));
+      evtEl.addEventListener("click", () => openYearEventPicker(sd, evt));
       taskRow.append(evtEl);
     });
 
@@ -595,7 +609,7 @@ dom.colorDeleteBtn.addEventListener("click", () => {
   dom.colorPicker.hidden = true;
   state.pendingYearEvent = null;
   clearYearSelection();
-  renderYear();
+  renderAll();
 });
 
 dom.colorSaveBtn.addEventListener("click", () => {
@@ -613,7 +627,7 @@ dom.colorSaveBtn.addEventListener("click", () => {
   dom.colorPicker.hidden = true;
   state.pendingYearEvent = null;
   clearYearSelection();
-  renderYear();
+  renderAll();
 });
 
 let yearSelectedStart = null;
@@ -702,27 +716,27 @@ function renderYear() {
       const isSameDate = sd === lastDate;
 
       const item = mkEl("div", { className: "year-event-item" });
-      const dot = mkEl("div", { className: "year-event-dot" });
-      dot.style.backgroundColor = evt.color;
 
-      const txt = mkEl("span", { className: "year-event-text" });
-
+      let datePrefix = "";
       if (ed && ed !== sd) {
         const edDay = parseInt(ed.split("-")[2]);
         const sdMonth = parseInt(sd.split("-")[1]);
         const edMonth = parseInt(ed.split("-")[1]);
         if (sdMonth !== edMonth) {
-          txt.textContent = `-${sdMonth}月${sdDay}日-${edMonth}月${edDay}日 ${evt.text}`;
+          datePrefix = `-${sdMonth}月${sdDay}日-${edMonth}月${edDay}日`;
         } else {
-          txt.textContent = `-${sdDay}-${edDay}日 ${evt.text}`;
+          datePrefix = `-${sdDay}-${edDay}日`;
         }
-      } else if (isSameDate) {
-        txt.textContent = `         ${evt.text}`;
-      } else {
-        txt.textContent = `-${sdDay}日 ${evt.text}`;
+      } else if (!isSameDate) {
+        datePrefix = `-${sdDay}日`;
       }
 
-      item.append(dot, txt);
+      const dateSpan = mkEl("span", { className: "year-event-date", textContent: datePrefix });
+      const dot = mkEl("div", { className: "year-event-dot" });
+      dot.style.backgroundColor = evt.color;
+      const txt = mkEl("span", { className: "year-event-text", textContent: evt.text });
+
+      item.append(dateSpan, dot, txt);
       item.addEventListener("click", () => openYearEventPicker(sd, evt));
       eventsList.append(item);
       lastDate = sd;

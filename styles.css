@@ -548,6 +548,13 @@ h3 { font-size: 13px; font-weight: 500; letter-spacing: 0.05em; text-transform: 
   width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
 }
 
+.year-event-date {
+  color: var(--muted);
+  font-size: 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .year-event-text { color: var(--muted); line-height: 1.4; }
 .year-event-text strong { color: var(--ink); }
 
@@ -858,7 +865,10 @@ h3 { font-size: 13px; font-weight: 500; letter-spacing: 0.05em; text-transform: 
 
   .month-todo-fab.hidden { display: none; }
 
-  .month-layout { grid-template-columns: 48px minmax(0, 1fr); }
+  .month-layout { grid-template-columns: 58px minmax(0, 1fr); }
+  .month-date-row { padding: 4px 4px; gap: 4px; }
+  .month-date-row .date-num { width: 18px; font-size: 12px; }
+  .month-date-row .date-dow { width: 22px; font-size: 10px; }
 
   .today-sheet {
     padding: 12px 12px calc(var(--tab-height) + env(safe-area-inset-bottom, 0px) + 12px);
@@ -877,7 +887,9 @@ h3 { font-size: 13px; font-weight: 500; letter-spacing: 0.05em; text-transform: 
   .bullet-symbol { width: 36px; height: 36px; font-size: 16px; line-height: 36px; }
   .tab-icon { font-size: 15px; }
   .tab-button { font-size: 10px; }
-  .month-layout { grid-template-columns: 44px minmax(0, 1fr); }
-  .month-date-row { padding: 4px 6px; }
+  .month-layout { grid-template-columns: 50px minmax(0, 1fr); }
+  .month-date-row { padding: 4px 2px; gap: 2px; }
+  .month-date-row .date-num { width: 18px; font-size: 11px; }
+  .month-date-row .date-dow { width: 20px; font-size: 10px; }
   .month-task-row { padding: 3px 6px; }
 }

@@ -6,16 +6,23 @@
     <meta name="theme-color" content="#f8f7f4" />
     <title>子弹计划</title>
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=14" />
+    <link rel="stylesheet" href="./styles.css?v=15" />
   </head>
   <body>
     <main class="journal-shell">
       <header class="journal-header">
         <div>
-          <p class="eyebrow">个人子弹计划 <span class="version-badge">v21</span></p>
+          <p class="eyebrow">个人子弹计划 <span class="version-badge">v22</span></p>
           <h1 id="pageTitle">本周</h1>
         </div>
         <div class="header-actions">
+          <button class="auth-button" id="loginBtn" type="button">登录</button>
+          <span class="user-badge" id="userBadge" hidden>
+            <span class="user-icon">&#9786;</span>
+            <span id="userPhone"></span>
+            <button class="user-logout" id="logoutBtn" type="button" title="退出登录">&#10005;</button>
+          </span>
+          <span class="sync-status" id="syncStatus"></span>
           <button class="icon-button" id="settingsButton" type="button" aria-label="设置" title="设置">&#9881;</button>
           <button class="icon-button" id="installButton" type="button" aria-label="安装到桌面" title="安装到桌面">+</button>
         </div>
@@ -274,6 +281,29 @@
     </template>
 
     <script src="./parser.js?v=2"></script>
-    <script src="./app.js?v=14"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4/dist/av-min.js"></script>
+    <script src="./auth.js?v=1"></script>
+    <script src="./app.js?v=15"></script>
+
+    <!-- 登录弹窗 -->
+    <div class="login-overlay" id="loginOverlay" hidden>
+      <div class="login-panel">
+        <h2>手机号登录</h2>
+        <p class="login-hint">登录后数据自动同步到云端，多设备共享</p>
+        <label class="login-field">
+          <span>手机号</span>
+          <input id="phoneInput" type="tel" placeholder="输入手机号" maxlength="11" autocomplete="tel" />
+        </label>
+        <label class="login-field">
+          <span>验证码</span>
+          <div class="code-row">
+            <input id="codeInput" type="text" placeholder="输入验证码" maxlength="6" autocomplete="off" />
+            <button class="code-btn" id="sendCodeBtn" type="button">发送验证码</button>
+          </div>
+        </label>
+        <button class="primary-button login-confirm" id="confirmLoginBtn" type="button">确认登录</button>
+        <p class="login-note">未注册手机号将自动注册</p>
+      </div>
+    </div>
   </body>
 </html>
